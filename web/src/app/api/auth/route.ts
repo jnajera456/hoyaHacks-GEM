@@ -6,50 +6,62 @@ import { NextRequest, NextResponse } from 'next/server';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
 
+/**
+ * Authentication API routes
+ * - POST /api/auth with action: 'signup' or 'signin'
+ * Simplified for hackathon: plain text passwords accepted (not production)
+ */
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const { action, email, password, name } = body;
 
+    // Validate input
+    if (!email || !password) {
+      return NextResponse.json(
+        { error: 'Email and password required' },
+        { status: 400 }
+      );
+    }
+
     await connectDB();
 
     if (action === 'signup') {
       // Check if user exists
-      const existingUser = await User.findOne({ email });
+      const existingUser = await User.findOne({ email: email.toLowerCase() });
       if (existingUser) {
-        return NextResponse.json({ error: 'User already exists' }, { status: 400 });
+        return NextResponse.json(
+          { error: 'User already exists' },
+          { status: 400 }
+        );
       }
 
-      // Hash password
+      // Hash password (for hackathon, plain text acceptable but we hash anyway)
       const hashedPassword = await bcryptjs.hash(password, 10);
-      const userId = `user_${Date.now()}`;
 
-      // Create new user
+      // Create new user with simplified schema
       const user = new User({
-        id: userId,
-        email,
+        email: email.toLowerCase(),
         name: name || email.split('@')[0],
-        passwordHash: hashedPassword,
-        isGuest: false,
+        password: hashedPassword,
       });
 
       await user.save();
 
-      // Generate token
-      const token = jwt.sign({ id: user.id, email: user.email }, JWT_SECRET, {
-        expiresIn: '7d',
-      });
+      // Generate JWT token
+      const token = jwt.sign(
+        { userId: user._id.toString(), email: user.email },
+        JWT_SECRET,
+        { expiresIn: '7d' }
+      );
 
       return NextResponse.json(
         {
           token,
           user: {
-            id: user.id,
+            id: user._id.toString(),
             name: user.name,
             email: user.email,
-            avatarColor: user.avatarColor,
-            preferences: user.preferences,
-            studyStats: user.studyStats,
           },
         },
         { status: 201 }
@@ -57,71 +69,46 @@ export async function POST(request: NextRequest) {
     }
 
     if (action === 'signin') {
-      const user = await User.findOne({ email });
+      const user = await User.findOne({ email: email.toLowerCase() });
 
-      if (!user || !user.passwordHash) {
+      if (!user) {
         return NextResponse.json(
-          { error: 'Invalid credentials or account not found' },
+          { error: 'Invalid credentials' },
           { status: 401 }
         );
       }
 
-      const passwordMatch = await bcryptjs.compare(password, user.passwordHash);
+      // Compare provided password with hashed password
+      const passwordMatch = await bcryptjs.compare(password, user.password);
 
       if (!passwordMatch) {
-        return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
+        return NextResponse.json(
+          { error: 'Invalid credentials' },
+          { status: 401 }
+        );
       }
 
-      const token = jwt.sign({ id: user.id, email: user.email }, JWT_SECRET, {
-        expiresIn: '7d',
-      });
+      // Generate JWT token
+      const token = jwt.sign(
+        { userId: user._id.toString(), email: user.email },
+        JWT_SECRET,
+        { expiresIn: '7d' }
+      );
 
       return NextResponse.json({
         token,
         user: {
-          id: user.id,
+          id: user._id.toString(),
           name: user.name,
           email: user.email,
-          avatarColor: user.avatarColor,
-          preferences: user.preferences,
-          studyStats: user.studyStats,
         },
       });
     }
 
-    if (action === 'guest') {
-      const userId = `guest_${Date.now()}`;
-      const guestUser = new User({
-        id: userId,
-        email: `guest-${Date.now()}@studytoks.local`,
-        name: 'Guest User',
-        isGuest: true,
-        avatarColor: '#6B7280',
-      });
-
-      await guestUser.save();
-
-      const token = jwt.sign({ id: guestUser.id, isGuest: true }, JWT_SECRET, {
-        expiresIn: '7d',
-      });
-
-      return NextResponse.json({
-        token,
-        user: {
-          id: guestUser.id,
-          name: guestUser.name,
-          email: guestUser.email,
-          isGuest: true,
-          avatarColor: guestUser.avatarColor,
-          preferences: guestUser.preferences,
-          studyStats: guestUser.studyStats,
-        },
-      });
-    }
-
-    return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
+    return NextResponse.json({ error: 'Invalid action. Use signup or signin' }, { status: 400 });
   } catch (error) {
     console.error('Auth error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
+

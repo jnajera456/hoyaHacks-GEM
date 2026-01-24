@@ -1,85 +1,40 @@
 import mongoose from 'mongoose';
 
+/**
+ * User schema - represents authenticated users
+ * Single source of truth for user identity and metadata
+ */
 const userSchema = new mongoose.Schema(
   {
-    id: {
-      type: String,
-      required: true,
-      unique: true,
-    },
-    name: {
-      type: String,
-      required: true,
-    },
+    _id: mongoose.Schema.Types.ObjectId, // MongoDB default
     email: {
       type: String,
       required: true,
       unique: true,
       lowercase: true,
+      index: true,
     },
-    passwordHash: {
+    name: {
       type: String,
-      default: null, // null if using OAuth
+      required: true,
     },
-    avatarColor: {
+    // Simple auth: stored as plain text for hackathon demo
+    // In production, this should be hashed with bcryptjs
+    password: {
       type: String,
-      default: '#7C3AED',
-    },
-    isGuest: {
-      type: Boolean,
-      default: false,
-    },
-    preferences: {
-      theme: {
-        type: String,
-        enum: ['light', 'dark', 'auto'],
-        default: 'light',
-      },
-      notifications: {
-        type: Boolean,
-        default: true,
-      },
-      dailyReminder: {
-        type: Boolean,
-        default: true,
-      },
-      studyGoal: {
-        type: Number,
-        default: 30, // minutes per day
-      },
-      language: {
-        type: String,
-        default: 'en',
-      },
-    },
-    studyStats: {
-      totalStudyTime: {
-        type: Number,
-        default: 0, // in minutes
-      },
-      daysStudied: {
-        type: Number,
-        default: 0,
-      },
-      longestStreak: {
-        type: Number,
-        default: 0,
-      },
-      averageScore: {
-        type: Number,
-        default: 0,
-      },
+      required: true,
     },
     createdAt: {
       type: Date,
       default: Date.now,
+      index: true,
     },
     updatedAt: {
       type: Date,
       default: Date.now,
     },
   },
-  { collection: 'users' }
+  { collection: 'users', timestamps: true }
 );
 
 export const User = mongoose.models.User || mongoose.model('User', userSchema);
