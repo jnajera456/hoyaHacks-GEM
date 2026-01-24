@@ -18,8 +18,7 @@ export async function POST(request) {
 
     console.log("📝 Processing text:", text.substring(0, 100) + "...");
 
-    // Simple test prompt first
-    const prompt = `Create 3 study items from this lecture content. Return ONLY valid JSON in this exact format:
+    const prompt = `Create study materials from this lecture content. Return ONLY valid JSON in this exact format:
     {
       "materials": [
         {
@@ -41,7 +40,7 @@ export async function POST(request) {
       ]
     }
 
-    Content: ${text.substring(0, 500)}`;
+    Content: ${text.substring(0, 1000)}`;
 
     console.log("🤖 Sending request to Gemini...");
     
@@ -49,39 +48,35 @@ export async function POST(request) {
     const response = await result.response;
     const geminiText = response.text();
     
-    console.log("✅ Raw Gemini response received:");
-    console.log("--- Response Start ---");
-    console.log(geminiText);
-    console.log("--- Response End ---");
+    console.log("✅ Raw Gemini response received");
 
     // Try to extract JSON
     const jsonMatch = geminiText.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      console.error("❌ No JSON found in response");
-      return NextResponse.json({
-        success: false,
-        error: "No valid JSON in AI response",
-        rawResponse: geminiText.substring(0, 200)
-      });
-    }
-
-    const jsonString = jsonMatch[0];
-    console.log("📊 Extracted JSON string:", jsonString.substring(0, 200) + "...");
-
     let parsedData;
-    try {
-      parsedData = JSON.parse(jsonString);
-      console.log("✅ Successfully parsed JSON");
-    } catch (parseError) {
-      console.error("❌ JSON parse error:", parseError.message);
-      // Create fallback response
+    
+    if (jsonMatch) {
+      try {
+        parsedData = JSON.parse(jsonMatch[0]);
+        console.log("✅ Successfully parsed JSON");
+      } catch (parseError) {
+        console.error("❌ JSON parse error:", parseError.message);
+        parsedData = {
+          materials: [
+            {
+              type: "summary",
+              content: "Study materials generated from your text.",
+              id: "fallback_1"
+            }
+          ]
+        };
+      }
+    } else {
       parsedData = {
         materials: [
           {
             type: "summary",
-            content: "Study materials generated from your text. Here's what to study: " + text.substring(0, 100),
-            id: "fallback_1",
-            tags: ["study", "notes"]
+            content: "No JSON found in response. Raw: " + geminiText.substring(0, 200),
+            id: "fallback_2"
           }
         ]
       };
@@ -93,12 +88,25 @@ export async function POST(request) {
       id: `material_${Date.now()}_${index}`
     }));
 
+    // Create a deck to save
+    const deck = {
+      id: `deck_${Date.now()}`,
+      title: `Study Deck - ${new Date().toLocaleDateString()}`,
+      materials: materialsWithIds,
+      sourceText: text.substring(0, 200) + (text.length > 200 ? '...' : ''),
+      generatedAt: new Date().toISOString(),
+      rawGeminiResponse: geminiText // Save the raw response too
+    };
+
     console.log(`🎉 Generated ${materialsWithIds.length} study materials`);
+    
+    // Save to localStorage via client-side (we'll return it and client saves)
     
     return NextResponse.json({
       success: true,
       materials: materialsWithIds,
-      rawResponse: geminiText.substring(0, 300) // Include for debugging
+      deck: deck, // Include the full deck
+      message: "Study materials generated successfully!"
     });
 
   } catch (error) {
@@ -115,7 +123,7 @@ export async function POST(request) {
   }
 }
 
-// Optional: GET method for testing
+// GET method for testing
 export async function GET() {
   return NextResponse.json({
     message: "StudyToks Generate API is running!",

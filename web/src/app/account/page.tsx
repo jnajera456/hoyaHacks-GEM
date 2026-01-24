@@ -25,9 +25,28 @@ import {
   Flame,
   BarChart3,
   FileText,
-  Share2
+  Share2,
+  ExternalLink
 } from 'lucide-react';
 
+// Updated types to match what Gemini generates
+type StudyMaterial = {
+  type: 'flashcard' | 'summary' | 'concept';
+  content: string;
+  explanation?: string;
+  tags?: string[];
+  id: string;
+};
+
+type GeneratedDeck = {
+  id: string;
+  title: string;
+  materials: StudyMaterial[];
+  sourceText?: string;
+  generatedAt: string;
+};
+
+// Keep your existing UserType, StudySession types as they are
 type UserType = {
   id: string;
   name: string;
@@ -38,32 +57,16 @@ type UserType = {
     theme: 'light' | 'dark' | 'auto';
     notifications: boolean;
     dailyReminder: boolean;
-    studyGoal: number; // minutes per day
+    studyGoal: number;
     language: string;
   };
   studyStats?: {
-    totalStudyTime: number; // in minutes
+    totalStudyTime: number;
     daysStudied: number;
     longestStreak: number;
     averageScore: number;
-  };
-};
-
-type DeckType = {
-  id: string;
-  title: string;
-  description: string;
-  subject: string;
-  tags: string[];
-  createdAt: string;
-  lastStudied: string;
-  content: {
-    flashcards: any[];
-  };
-  stats?: {
-    timesStudied: number;
-    averageScore: number;
-    lastScore: number;
+    totalDecks?: number;
+    totalFlashcards?: number;
   };
 };
 
@@ -79,7 +82,7 @@ type StudySession = {
 
 export default function AccountPage() {
   const [user, setUser] = useState<UserType | null>(null);
-  const [userDecks, setUserDecks] = useState<DeckType[]>([]);
+  const [userDecks, setUserDecks] = useState<GeneratedDeck[]>([]);
   const [studySessions, setStudySessions] = useState<StudySession[]>([]);
   const [activeTab, setActiveTab] = useState<'overview' | 'decks' | 'history' | 'preferences'>('overview');
   const [isEditingProfile, setIsEditingProfile] = useState(false);
@@ -96,8 +99,7 @@ export default function AccountPage() {
   // Load user, decks, and study history from localStorage
   useEffect(() => {
     const savedUser = localStorage.getItem('studytoks_user');
-    const savedDecks = localStorage.getItem('studytoks_decks');
-    const savedSessions = localStorage.getItem('studytoks_sessions');
+    const savedDecks = localStorage.getItem('studyDecks'); // KEY CHANGE: 'studyDecks' not 'studytoks_decks'
     
     if (savedUser) {
       const userData = JSON.parse(savedUser);
@@ -111,65 +113,73 @@ export default function AccountPage() {
         studyGoal: userData.preferences?.studyGoal || 30,
         language: userData.preferences?.language || 'en'
       });
+    } else {
+      // Auto-create guest user if none exists
+      const guestUser: UserType = {
+        id: 'guest_' + Date.now(),
+        name: 'Guest User',
+        email: 'guest@studytoks.com',
+        isGuest: true,
+        avatarColor: '#6B7280',
+        preferences: {
+          theme: 'light',
+          notifications: true,
+          dailyReminder: true,
+          studyGoal: 30,
+          language: 'en'
+        },
+        studyStats: {
+          totalStudyTime: 0,
+          daysStudied: 0,
+          longestStreak: 0,
+          averageScore: 0,
+          totalDecks: 0,
+          totalFlashcards: 0
+        }
+      };
+      localStorage.setItem('studytoks_user', JSON.stringify(guestUser));
+      setUser(guestUser);
+      setEditForm({
+        name: guestUser.name,
+        email: guestUser.email,
+        theme: 'light',
+        notifications: true,
+        dailyReminder: true,
+        studyGoal: 30,
+        language: 'en'
+      });
     }
     
     if (savedDecks) {
-      setUserDecks(JSON.parse(savedDecks));
+      try {
+        const decks = JSON.parse(savedDecks);
+        setUserDecks(decks);
+        
+        // Update user stats with deck count
+        if (user) {
+          const totalFlashcards = decks.reduce((total: number, deck: GeneratedDeck) => 
+            total + deck.materials.filter(m => m.type === 'flashcard').length, 0);
+          
+          const updatedUser = {
+            ...user,
+            studyStats: {
+              ...user.studyStats,
+              totalDecks: decks.length,
+              totalFlashcards: totalFlashcards
+            }
+          };
+          setUser(updatedUser);
+          localStorage.setItem('studytoks_user', JSON.stringify(updatedUser));
+        }
+      } catch (error) {
+        console.error('Error parsing decks:', error);
+      }
     }
     
+    // Load study sessions
+    const savedSessions = localStorage.getItem('studytoks_sessions');
     if (savedSessions) {
       setStudySessions(JSON.parse(savedSessions));
-    } else {
-      // Generate mock study history for demo
-      const mockSessions: StudySession[] = [
-        {
-          id: '1',
-          deckId: 'demo1',
-          deckTitle: 'Biology: Cell Structure',
-          date: '2024-01-20',
-          duration: 25,
-          score: 85,
-          cardsStudied: 15
-        },
-        {
-          id: '2',
-          deckId: 'demo2',
-          deckTitle: 'Spanish Vocabulary',
-          date: '2024-01-19',
-          duration: 18,
-          score: 92,
-          cardsStudied: 20
-        },
-        {
-          id: '3',
-          deckId: 'demo3',
-          deckTitle: 'JavaScript Fundamentals',
-          date: '2024-01-18',
-          duration: 35,
-          score: 78,
-          cardsStudied: 25
-        },
-        {
-          id: '4',
-          deckId: 'demo4',
-          deckTitle: 'World History',
-          date: '2024-01-17',
-          duration: 42,
-          score: 88,
-          cardsStudied: 30
-        },
-        {
-          id: '5',
-          deckId: 'demo5',
-          deckTitle: 'Chemistry Basics',
-          date: '2024-01-16',
-          duration: 29,
-          score: 75,
-          cardsStudied: 18
-        }
-      ];
-      setStudySessions(mockSessions);
-      localStorage.setItem('studytoks_sessions', JSON.stringify(mockSessions));
     }
   }, []);
 
@@ -190,7 +200,10 @@ export default function AccountPage() {
         totalStudyTime: 1250,
         daysStudied: 45,
         longestStreak: 14,
-        averageScore: 82
+        averageScore: 82,
+        totalDecks: userDecks.length,
+        totalFlashcards: userDecks.reduce((total, deck) => 
+          total + deck.materials.filter(m => m.type === 'flashcard').length, 0)
       }
     };
     localStorage.setItem('studytoks_user', JSON.stringify(demoUser));
@@ -227,18 +240,40 @@ export default function AccountPage() {
     if (confirm('Are you sure you want to delete this deck? This action cannot be undone.')) {
       const updated = userDecks.filter(d => d.id !== deckId);
       setUserDecks(updated);
-      localStorage.setItem('studytoks_decks', JSON.stringify(updated));
+      localStorage.setItem('studyDecks', JSON.stringify(updated));
+      
+      // Update user stats
+      if (user) {
+        const totalFlashcards = updated.reduce((total: number, deck: GeneratedDeck) => 
+          total + deck.materials.filter(m => m.type === 'flashcard').length, 0);
+        
+        const updatedUser = {
+          ...user,
+          studyStats: {
+            ...user.studyStats,
+            totalDecks: updated.length,
+            totalFlashcards: totalFlashcards
+          }
+        };
+        setUser(updatedUser);
+        localStorage.setItem('studytoks_user', JSON.stringify(updatedUser));
+      }
+      
+      alert('Deck deleted successfully!');
     }
   };
 
-  const handleExportDeck = (deck: DeckType) => {
+  const handleExportDeck = (deck: GeneratedDeck) => {
     const dataStr = JSON.stringify(deck, null, 2);
     const dataBlob = new Blob([dataStr], { type: 'application/json' });
     const url = URL.createObjectURL(dataBlob);
     const link = document.createElement('a');
     link.href = url;
     link.download = `studytoks-${deck.title.toLowerCase().replace(/\s+/g, '-')}.json`;
+    document.body.appendChild(link);
     link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
   const handleExportAllData = () => {
@@ -255,17 +290,24 @@ export default function AccountPage() {
     const link = document.createElement('a');
     link.href = url;
     link.download = `studytoks-data-export-${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(link);
     link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
-  const handleLoadDeck = (deck: DeckType) => {
-    localStorage.setItem('current_studytoks_deck', JSON.stringify(deck.content));
-    alert('Deck loaded! Go to home page to study it.');
+  const handleStudyDeck = (deck: GeneratedDeck) => {
+    // Store the deck in session storage for the results page
+    sessionStorage.setItem('currentDeck', JSON.stringify(deck));
+    window.location.href = '/results';
   };
 
+  // Calculate stats
   const stats = {
-    totalCards: userDecks.reduce((sum, deck) => sum + (deck.content?.flashcards?.length || 0), 0),
     totalDecks: userDecks.length,
+    totalFlashcards: userDecks.reduce((total, deck) => 
+      total + deck.materials.filter(m => m.type === 'flashcard').length, 0),
+    totalMaterials: userDecks.reduce((total, deck) => total + deck.materials.length, 0),
     studyTime: user?.studyStats?.totalStudyTime || 0,
     mastery: user?.studyStats?.averageScore || 78,
     streak: user?.studyStats?.longestStreak || 0,
@@ -276,7 +318,7 @@ export default function AccountPage() {
   const formatTime = (minutes: number) => {
     const hours = Math.floor(minutes / 60);
     const mins = minutes % 60;
-    return `${hours}h ${mins}m`;
+    return hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
   };
 
   // Get recent sessions (last 5)
@@ -284,6 +326,13 @@ export default function AccountPage() {
 
   // Calculate today's study time (mock for demo)
   const todayStudyTime = 45;
+
+  // Get unique subjects from deck tags
+  const getDeckSubjects = (deck: GeneratedDeck) => {
+    const allTags = deck.materials.flatMap(m => m.tags || []);
+    const uniqueTags = [...new Set(allTags)];
+    return uniqueTags.slice(0, 3);
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -294,7 +343,7 @@ export default function AccountPage() {
             <Link href="/" className="text-gray-600 hover:text-gray-900 flex items-center">
               <span className="mr-2">←</span> Back to Home
             </Link>
-            <h1 className="text-2xl font-bold text-gray-900">My Account</h1>
+            <h1 className="text-2xl font-bold text-gray-900">My Study Decks</h1>
           </div>
           {user && (
             <button
@@ -430,8 +479,16 @@ export default function AccountPage() {
                 <h3 className="font-bold text-gray-900 mb-4">Quick Stats</h3>
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
-                    <span className="text-gray-600 text-sm">Today's Study</span>
-                    <span className="font-medium">{todayStudyTime} min</span>
+                    <span className="text-gray-600 text-sm">Total Decks</span>
+                    <span className="font-medium">{stats.totalDecks}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-600 text-sm">Flashcards</span>
+                    <span className="font-medium">{stats.totalFlashcards}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-600 text-sm">Study Time</span>
+                    <span className="font-medium">{formatTime(stats.studyTime)}</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-gray-600 text-sm">Current Streak</span>
@@ -439,10 +496,6 @@ export default function AccountPage() {
                       <Flame size={14} className="text-orange-500 mr-1" />
                       {stats.streak} days
                     </span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-gray-600 text-sm">Total Decks</span>
-                    <span className="font-medium">{stats.totalDecks}</span>
                   </div>
                 </div>
               </div>
@@ -458,7 +511,11 @@ export default function AccountPage() {
                     <div className="flex items-center justify-between">
                       <div>
                         <h2 className="text-2xl font-bold mb-2 leading-tight">Welcome back, {user.name.split(' ')[0]}! 👋</h2>
-                        <p className="text-purple-100">Keep up the great work. You're on a {stats.streak} day streak!</p>
+                        <p className="text-purple-100">
+                          {stats.totalDecks > 0 
+                            ? `You have ${stats.totalDecks} study decks with ${stats.totalFlashcards} flashcards.`
+                            : 'Generate your first study deck to get started!'}
+                        </p>
                       </div>
                       <div className="hidden md:block">
                         <div className="text-center">
@@ -484,11 +541,11 @@ export default function AccountPage() {
                     <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
                       <div className="flex items-center justify-between mb-4">
                         <div className="p-2 bg-green-50 rounded-lg">
-                          <Clock className="text-green-600" size={24} />
+                          <FileText className="text-green-600" size={24} />
                         </div>
                       </div>
-                      <div className="text-2xl font-bold text-gray-900">{formatTime(stats.studyTime)}</div>
-                      <div className="text-gray-600">Total Study Time</div>
+                      <div className="text-2xl font-bold text-gray-900">{stats.totalFlashcards}</div>
+                      <div className="text-gray-600">Flashcards</div>
                     </div>
 
                     <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
@@ -512,42 +569,54 @@ export default function AccountPage() {
                     </div>
                   </div>
 
-                  {/* Recent Activity */}
+                  {/* Recent Decks */}
                   <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-                    <div className="px-6 py-4 border-b border-gray-200">
-                      <h3 className="font-bold text-gray-900">Recent Study Sessions</h3>
+                    <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+                      <h3 className="font-bold text-gray-900">Recent Decks</h3>
+                      <Link href="/" className="text-purple-600 hover:text-purple-700 text-sm font-medium">
+                        + Create New
+                      </Link>
                     </div>
-                    <div className="divide-y divide-gray-200">
-                      {recentSessions.map((session) => (
-                        <div key={session.id} className="px-6 py-4 hover:bg-gray-50 transition-colors">
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <h4 className="font-medium text-gray-900">{session.deckTitle}</h4>
-                              <div className="flex items-center space-x-4 mt-1 text-sm text-gray-600">
-                                <span className="flex items-center">
-                                  <Calendar size={14} className="mr-1" />
-                                  {new Date(session.date).toLocaleDateString()}
-                                </span>
-                                <span>{session.duration} min</span>
-                                <span>{session.cardsStudied} cards</span>
+                    {userDecks.length > 0 ? (
+                      <div className="divide-y divide-gray-200">
+                        {userDecks.slice(0, 3).map((deck) => (
+                          <div key={deck.id} className="px-6 py-4 hover:bg-gray-50 transition-colors">
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <h4 className="font-medium text-gray-900">{deck.title}</h4>
+                                <div className="flex items-center space-x-4 mt-1 text-sm text-gray-600">
+                                  <span className="flex items-center">
+                                    <Calendar size={14} className="mr-1" />
+                                    {new Date(deck.generatedAt).toLocaleDateString()}
+                                  </span>
+                                  <span>{deck.materials.length} materials</span>
+                                  <span>{deck.materials.filter(m => m.type === 'flashcard').length} flashcards</span>
+                                </div>
                               </div>
-                            </div>
-                            <div className="flex items-center space-x-4">
-                              <div className="text-right">
-                                <div className="font-medium text-gray-900">{session.score}%</div>
-                                <div className="text-xs text-gray-500">Score</div>
+                              <div className="flex items-center space-x-4">
+                                <button
+                                  onClick={() => handleStudyDeck(deck)}
+                                  className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 flex items-center space-x-2 text-sm"
+                                >
+                                  <BookOpen size={14} />
+                                  <span>Study</span>
+                                </button>
                               </div>
-                              <ChevronRight size={18} className="text-gray-400" />
                             </div>
                           </div>
-                        </div>
-                      ))}
-                    </div>
-                    {recentSessions.length === 0 && (
+                        ))}
+                      </div>
+                    ) : (
                       <div className="px-6 py-8 text-center text-gray-500">
-                        <History size={48} className="mx-auto mb-4 text-gray-300" />
-                        <p>No study sessions yet</p>
-                        <p className="text-sm mt-2">Start studying to see your history here</p>
+                        <BookOpen size={48} className="mx-auto mb-4 text-gray-300" />
+                        <p>No study decks yet</p>
+                        <p className="text-sm mt-2">Generate study materials on the home page to create your first deck</p>
+                        <Link 
+                          href="/" 
+                          className="inline-block mt-4 px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm font-medium"
+                        >
+                          Go to Home
+                        </Link>
                       </div>
                     )}
                   </div>
@@ -560,8 +629,8 @@ export default function AccountPage() {
                   <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
                     <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
                       <div>
-                        <h3 className="font-bold text-gray-900">My Decks</h3>
-                        <p className="text-sm text-gray-600 mt-1">Manage all your saved study decks</p>
+                        <h3 className="font-bold text-gray-900">My Study Decks</h3>
+                        <p className="text-sm text-gray-600 mt-1">All your generated study materials</p>
                       </div>
                       <div className="flex space-x-3">
                         <button
@@ -571,81 +640,91 @@ export default function AccountPage() {
                           <Download size={18} />
                           <span>Export All</span>
                         </button>
+                        <Link
+                          href="/"
+                          className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 flex items-center space-x-2"
+                        >
+                          <BookOpen size={18} />
+                          <span>Create New</span>
+                        </Link>
                       </div>
                     </div>
 
                     {userDecks.length > 0 ? (
                       <div className="divide-y divide-gray-200">
-                        {userDecks.map((deck) => (
-                          <div key={deck.id} className="px-6 py-4 hover:bg-gray-50 transition-colors">
-                            <div className="flex items-start justify-between">
-                              <div className="flex-1">
-                                <div className="flex items-start space-x-4">
-                                  <div className="p-3 bg-purple-50 rounded-lg">
-                                    <BookOpen className="text-purple-600" size={20} />
-                                  </div>
-                                  <div>
-                                    <h4 className="font-bold text-gray-900">{deck.title}</h4>
-                                    <p className="text-gray-600 text-sm mt-1">{deck.description}</p>
-                                    <div className="flex flex-wrap gap-2 mt-3">
-                                      {deck.tags?.slice(0, 3).map((tag, index) => (
-                                        <span key={index} className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded">
-                                          {tag}
-                                        </span>
-                                      ))}
+                        {userDecks.map((deck) => {
+                          const flashcardCount = deck.materials.filter(m => m.type === 'flashcard').length;
+                          const summaryCount = deck.materials.filter(m => m.type === 'summary').length;
+                          const conceptCount = deck.materials.filter(m => m.type === 'concept').length;
+                          const tags = getDeckSubjects(deck);
+
+                          return (
+                            <div key={deck.id} className="px-6 py-4 hover:bg-gray-50 transition-colors">
+                              <div className="flex items-start justify-between">
+                                <div className="flex-1">
+                                  <div className="flex items-start space-x-4">
+                                    <div className="p-3 bg-purple-50 rounded-lg">
+                                      <BookOpen className="text-purple-600" size={20} />
                                     </div>
-                                    <div className="flex items-center space-x-4 mt-3 text-sm text-gray-500">
-                                      <span className="flex items-center">
-                                        <FileText size={14} className="mr-1" />
-                                        {deck.content?.flashcards?.length || 0} cards
-                                      </span>
-                                      <span className="flex items-center">
-                                        <Calendar size={14} className="mr-1" />
-                                        Created {new Date(deck.createdAt).toLocaleDateString()}
-                                      </span>
-                                      {deck.stats && (
+                                    <div>
+                                      <h4 className="font-bold text-gray-900">{deck.title}</h4>
+                                      <p className="text-gray-600 text-sm mt-1">
+                                        {deck.sourceText || "Generated from study materials"}
+                                      </p>
+                                      <div className="flex flex-wrap gap-2 mt-3">
+                                        {tags.map((tag, index) => (
+                                          <span key={index} className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded">
+                                            {tag}
+                                          </span>
+                                        ))}
+                                      </div>
+                                      <div className="flex items-center space-x-4 mt-3 text-sm text-gray-500">
                                         <span className="flex items-center">
-                                          <TrendingUp size={14} className="mr-1" />
-                                          {deck.stats.averageScore}% avg
+                                          <FileText size={14} className="mr-1" />
+                                          {flashcardCount} flashcards, {summaryCount} summaries, {conceptCount} concepts
                                         </span>
-                                      )}
+                                        <span className="flex items-center">
+                                          <Calendar size={14} className="mr-1" />
+                                          {new Date(deck.generatedAt).toLocaleDateString()}
+                                        </span>
+                                      </div>
                                     </div>
                                   </div>
                                 </div>
-                              </div>
-                              <div className="flex space-x-2 ml-4">
-                                <button
-                                  onClick={() => handleLoadDeck(deck)}
-                                  className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center space-x-2 text-sm font-medium"
-                                >
-                                  <BookOpen size={14} />
-                                  <span>Study</span>
-                                </button>
-                                <button
-                                  onClick={() => handleExportDeck(deck)}
-                                  className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center space-x-2 text-sm font-medium"
-                                >
-                                  <Download size={14} />
-                                  <span>Export</span>
-                                </button>
-                                <button
-                                  onClick={() => handleDeleteDeck(deck.id)}
-                                  className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center space-x-2 text-sm font-medium"
-                                >
-                                  <Trash2 size={14} />
-                                  <span>Delete</span>
-                                </button>
+                                <div className="flex flex-col space-y-2 ml-4">
+                                  <button
+                                    onClick={() => handleStudyDeck(deck)}
+                                    className="px-3 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 flex items-center justify-center space-x-2 text-sm font-medium"
+                                  >
+                                    <BookOpen size={14} />
+                                    <span>Study</span>
+                                  </button>
+                                  <button
+                                    onClick={() => handleExportDeck(deck)}
+                                    className="px-3 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 flex items-center justify-center space-x-2 text-sm font-medium"
+                                  >
+                                    <Download size={14} />
+                                    <span>Export</span>
+                                  </button>
+                                  <button
+                                    onClick={() => handleDeleteDeck(deck.id)}
+                                    className="px-3 py-2 border border-red-300 text-red-600 rounded-lg hover:bg-red-50 flex items-center justify-center space-x-2 text-sm font-medium"
+                                  >
+                                    <Trash2 size={14} />
+                                    <span>Delete</span>
+                                  </button>
+                                </div>
                               </div>
                             </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     ) : (
                       <div className="px-6 py-12 text-center">
                         <BookOpen size={64} className="mx-auto mb-4 text-gray-300" />
                         <p className="text-gray-500 text-lg">No saved decks yet</p>
                         <p className="text-gray-400 mt-2 max-w-md mx-auto">
-                          Generate some flashcards on the home page and save them here to track your progress!
+                          Generate some flashcards on the home page and they'll automatically appear here!
                         </p>
                         <Link 
                           href="/" 
