@@ -19,80 +19,117 @@ export default function ResultsPage() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [deck, setDeck] = useState<GeneratedDeck | null>(null);
   const [showAnswer, setShowAnswer] = useState(false);
+  const [audioLoading, setAudioLoading] = useState(false);
+  const [audioPlaying, setAudioPlaying] = useState(false);
+  const [isClient, setIsClient] = useState(false); // Add this
   const containerRef = useRef<HTMLDivElement>(null);
   const touchStartY = useRef(0);
   const touchEndY = useRef(0);
+  const currentAudioRef = useRef<HTMLAudioElement | null>(null);
 
-  // Load deck from sessionStorage
+  // First effect - mark as client-side
   useEffect(() => {
+    setIsClient(true);
+  }, []);
+
+  // Second effect - load deck only on client
+  useEffect(() => {
+    if (!isClient) return; // Wait until client-side
+
+    const sampleDeck: GeneratedDeck = {
+      id: '1',
+      title: 'Biology Study Deck',
+      materials: [
+        {
+          type: 'flashcard',
+          content: 'What is photosynthesis?The process by which plants convert light energy into chemical energy',
+          id: '1'
+        },
+        {
+          type: 'summary',
+          content: 'Mitochondria are known as the powerhouse of the cell because they generate most of the cell\'s supply of ATP, which is used as a source of chemical energy.',
+          id: '2'
+        },
+        {
+          type: 'concept',
+          content: 'DNA (Deoxyribonucleic Acid) is a molecule that carries genetic information. It consists of two strands forming a double helix structure.',
+          id: '3'
+        },
+        {
+          type: 'flashcard',
+          content: 'What are the four stages of mitosis?Prophase, Metaphase, Anaphase, and Telophase',
+          id: '4'
+        }
+      ],
+      generatedAt: new Date().toISOString()
+    };
+
     const savedDeck = sessionStorage.getItem('currentDeck');
     if (savedDeck) {
       try {
         const parsedDeck = JSON.parse(savedDeck);
         setDeck(parsedDeck);
       } catch {
-        // If no deck, use sample data
-        const sampleDeck: GeneratedDeck = {
-          id: '1',
-          title: 'Biology Study Deck',
-          materials: [
-            {
-              type: 'flashcard',
-              content: 'What is photosynthesis?The process by which plants convert light energy into chemical energy',
-              id: '1'
-            },
-            {
-              type: 'summary',
-              content: 'Mitochondria are known as the powerhouse of the cell because they generate most of the cell\'s supply of ATP, which is used as a source of chemical energy.',
-              id: '2'
-            },
-            {
-              type: 'concept',
-              content: 'DNA (Deoxyribonucleic Acid) is a molecule that carries genetic information. It consists of two strands forming a double helix structure.',
-              id: '3'
-            },
-            {
-              type: 'flashcard',
-              content: 'What are the four stages of mitosis?Prophase, Metaphase, Anaphase, and Telophase',
-              id: '4'
-            }
-          ],
-          generatedAt: new Date().toISOString()
-        };
         setDeck(sampleDeck);
       }
     } else {
-      // Sample deck if nothing in sessionStorage
-      const sampleDeck: GeneratedDeck = {
-        id: '1',
-        title: 'Biology Study Deck',
-        materials: [
-          {
-            type: 'flashcard',
-            content: 'What is photosynthesis?The process by which plants convert light energy into chemical energy',
-            id: '1'
-          },
-          {
-            type: 'summary',
-            content: 'Mitochondria are known as the powerhouse of the cell because they generate most of the cell\'s supply of ATP, which is used as a source of chemical energy.',
-            id: '2'
-          },
-          {
-            type: 'concept',
-            content: 'DNA (Deoxyribonucleic Acid) is a molecule that carries genetic information. It consists of two strands forming a double helix structure.',
-            id: '3'
-          },
-          {
-            type: 'flashcard',
-            content: 'What are the four stages of mitosis?Prophase, Metaphase, Anaphase, and Telophase',
-            id: '4'
-          }
-        ],
-        generatedAt: new Date().toISOString()
-      };
       setDeck(sampleDeck);
     }
-  }, []);
+  }, [isClient]); // Run when isClient changes
+
+  // Audio playback function
+  const playAudio = async () => {
+    if (!deck) return;
+    
+    // Stop current audio if playing
+    if (currentAudioRef.current) {
+      currentAudioRef.current.pause();
+      currentAudioRef.current = null;
+      setAudioPlaying(false);
+    }
+
+    setAudioLoading(true);
+    
+    try {
+      const currentMaterial = deck.materials[currentIndex];
+      
+      // Call audio generation API
+      const response = await fetch('/api/generate-audio', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: currentMaterial.content })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to generate audio');
+      }
+
+      const audioBlob = await response.blob();
+      const audioUrl = URL.createObjectURL(audioBlob);
+      
+      const audio = new Audio(audioUrl);
+      currentAudioRef.current = audio;
+      
+      audio.onplay = () => setAudioPlaying(true);
+      audio.onended = () => {
+        setAudioPlaying(false);
+        URL.revokeObjectURL(audioUrl);
+        currentAudioRef.current = null;
+      };
+      audio.onerror = () => {
+        setAudioPlaying(false);
+        URL.revokeObjectURL(audioUrl);
+        currentAudioRef.current = null;
+      };
+
+      await audio.play();
+      
+    } catch (error) {
+      console.error('Audio generation error:', error);
+    } finally {
+      setAudioLoading(false);
+    }
+  };
 
   const handleTouchStart = (e: React.TouchEvent) => {
     touchStartY.current = e.touches[0].clientY;
@@ -117,12 +154,24 @@ export default function ResultsPage() {
 
   const handlePrev = () => {
     if (!deck) return;
+    // Stop audio when changing cards
+    if (currentAudioRef.current) {
+      currentAudioRef.current.pause();
+      currentAudioRef.current = null;
+      setAudioPlaying(false);
+    }
     setCurrentIndex(prev => prev > 0 ? prev - 1 : deck.materials.length - 1);
     setShowAnswer(false);
   };
 
   const handleNext = () => {
     if (!deck) return;
+    // Stop audio when changing cards
+    if (currentAudioRef.current) {
+      currentAudioRef.current.pause();
+      currentAudioRef.current = null;
+      setAudioPlaying(false);
+    }
     setCurrentIndex(prev => prev < deck.materials.length - 1 ? prev + 1 : 0);
     setShowAnswer(false);
   };
@@ -141,6 +190,16 @@ export default function ResultsPage() {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [deck]);
+
+  // Cleanup audio on unmount
+  useEffect(() => {
+    return () => {
+      if (currentAudioRef.current) {
+        currentAudioRef.current.pause();
+        currentAudioRef.current = null;
+      }
+    };
+  }, []);
 
   if (!deck) {
     return (
@@ -326,6 +385,54 @@ export default function ResultsPage() {
         gap: '1rem',
         zIndex: 10
       }}>
+        {/* Audio button */}
+        <button
+          onClick={playAudio}
+          disabled={audioLoading || audioPlaying}
+          style={{
+            width: '3.5rem',
+            height: '3.5rem',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: audioPlaying ? 'rgba(34, 197, 94, 0.3)' : 'rgba(255, 255, 255, 0.2)',
+            backdropFilter: 'blur(10px)',
+            border: '1px solid rgba(255, 255, 255, 0.3)',
+            borderRadius: '50%',
+            cursor: audioLoading || audioPlaying ? 'not-allowed' : 'pointer',
+            transition: 'all 0.2s',
+            boxShadow: '0 4px 6px rgba(0, 0, 0, 0.3)',
+            opacity: audioLoading ? 0.5 : 1
+          }}
+          onMouseEnter={(e) => {
+            if (!audioLoading && !audioPlaying) {
+              e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.3)';
+              e.currentTarget.style.transform = 'scale(1.1)';
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (!audioPlaying) {
+              e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.2)';
+            }
+            e.currentTarget.style.transform = 'scale(1)';
+          }}
+        >
+          {audioLoading ? (
+            <svg style={{ width: '1.5rem', height: '1.5rem', color: '#fff', animation: 'spin 1s linear infinite' }} fill="none" viewBox="0 0 24 24">
+              <circle style={{ opacity: 0.25 }} cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+              <path style={{ opacity: 0.75 }} fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+          ) : audioPlaying ? (
+            <svg style={{ width: '1.5rem', height: '1.5rem', color: '#22c55e' }} fill="currentColor" viewBox="0 0 24 24">
+              <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z"/>
+            </svg>
+          ) : (
+            <svg style={{ width: '1.5rem', height: '1.5rem', color: '#fff' }} fill="currentColor" viewBox="0 0 24 24">
+              <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
+            </svg>
+          )}
+        </button>
+
         <button
           onClick={handlePrev}
           style={{
@@ -436,6 +543,14 @@ export default function ResultsPage() {
           to {
             opacity: 1;
             transform: translateY(0);
+          }
+        }
+        @keyframes spin {
+          from {
+            transform: rotate(0deg);
+          }
+          to {
+            transform: rotate(360deg);
           }
         }
       `}</style>
