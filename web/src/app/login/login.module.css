@@ -75,18 +75,20 @@
 
 .rightPanel {
   flex: 1;
-  background-color: #fff;
-  padding: 60px;
+  background: #fff;
   display: flex;
   flex-direction: column;
-  justify-content: center;
-  align-items: center;
+  justify-content: flex-start; 
+  padding: 40px 60px;
 }
 
+/* Adjust the title to match the signup spacing */
 .signInTitle {
-  color: #333 !important;
-  font-size: 2.5em !important;
-  margin-bottom: 40px !important;
+  color: #303545 !important;
+  font-size: 2rem !important;
+  font-weight: 800 !important;
+  margin-bottom: 32px !important;
+  text-align: left;
 }
 
 /* Update this to make sure the form doesn't look too stretched on 50% width */
@@ -96,8 +98,11 @@
 }
 
 .inputField {
-  padding: 10px 15px !important;
-  border-radius: 5px !important;
+  height: 48px !important;
+  background-color: #f6f7fb !important;
+  border: none !important;
+  border-radius: 8px !important;
+  font-size: 1rem !important;
 }
 
 .formActions {
@@ -117,11 +122,12 @@
 
 .loginFormButton {
   width: 100%;
-  height: 45px !important;
-  font-size: 1.1em !important;
-  border-radius: 5px !important;
-  background-color: #fa541c !important; /* Orange color from inspiration */
-  border-color: #fa541c !important;
+  height: 56px !important;
+  background-color: #fa541c !important;
+  border-radius: 8px !important;
+  font-size: 1.1rem !important;
+  font-weight: 700 !important;
+  margin-top: 10px;
 }
 
 .loginFormButton:hover,
@@ -192,4 +198,45 @@
     height: 40px !important;
     font-size: 1em !important;
   }
+}
+
+.topNav {
+  display: flex;
+  gap: 24px;
+  margin-bottom: 60px; /* Controls the space above the form */
+  font-size: 1.1rem;
+  font-weight: 600;
+  width: 100%;
+}
+
+.activeTab {
+  color: #303545;
+  border-bottom: 4px solid #fa541c; /* Orange underline for both pages */
+  padding-bottom: 4px;
+}
+
+.navLink {
+  color: #646975;
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.navLink:hover {
+  color: #fa541c;
+}
+
+.formContainer {
+  width: 100%;
+  max-width: 440px;
+  margin: 0 auto;
+}
+
+.footerLink {
+  text-align: center;
+  margin-top: 32px;
+  color: #646975;
+  font-size: 1rem;
+  /* This creates the subtle line separating the form from the footer */
+  border-top: 1px solid #edeff4;
+  padding-top: 32px;
 }
