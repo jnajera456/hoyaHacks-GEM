@@ -23,7 +23,11 @@ async function run() {
   // Use unique values so re-running doesn’t fail on unique email constraints
   const runId = Date.now();
   const email = `testuser_${runId}@example.com`;
-  const bucket = R2_BUCKET || "demo-bucket";
+
+  if (!R2_BUCKET) {
+    throw new Error('R2_BUCKET is not defined in .env.local');
+  }
+  const bucket = R2_BUCKET;
 
   // 1) Create user
   const passwordHash = await bcrypt.hash("test-password", 10);
