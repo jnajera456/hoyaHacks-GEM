@@ -179,12 +179,6 @@ export default function Home() {
 
   return (
     <Layout style={{ minHeight: "100vh" }}>
-      <Header style={{ display: "flex", alignItems: "center" }}>
-        <Title level={4} style={{ color: "white", margin: 0 }}>
-          StudyToks - AI Study Assistant
-        </Title>
-      </Header>
-
       <Content style={{ padding: 16, maxWidth: 520, width: "100%", margin: "0 auto" }}>
         <Space orientation="vertical" size="large" style={{ width: "100%", marginTop: 8 }}>
           <div>
@@ -340,7 +334,7 @@ export default function Home() {
               />
               
               <div style={{ marginTop: 16 }}>
-                <Text strong>What's next?</Text>
+                <Text strong>What next?</Text>
                 <div style={{ marginTop: 8 }}>
                   <Button 
                     type="primary"
@@ -369,7 +363,7 @@ export default function Home() {
             <Title level={5} style={{ marginTop: 0 }}>How it works</Title>
             <ol style={{ margin: 0, paddingLeft: 18 }}>
               <li><Text strong>Upload a file</Text> (PDF, TXT, video, audio) <strong>OR</strong> <Text strong>paste text</Text></li>
-              <li>Click <Text strong>"Generate Study Materials"</Text></li>
+              <li>Click <Text strong>Generate Study Materials</Text></li>
               <li>Get flashcards, summaries, and concepts</li>
               <li>Study with TikTok-style interface</li>
               <li>All decks saved automatically</li>
