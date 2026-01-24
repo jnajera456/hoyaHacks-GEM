@@ -1,5 +1,7 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { NextResponse } from "next/server";
+import { textToSpeech } from "@/lib/ttsClient"; // Adjust path as needed
+import { createAudioScript } from "@/lib/audioUtils"; // Adjust path as needed
 
 // Initialize Gemini
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
@@ -7,7 +9,7 @@ const model = genAI.getGenerativeModel({ model: "gemini-3-flash-preview" });
 
 export async function POST(request) {
   try {
-    const { text } = await request.json();
+    const { text, generateAudio } = await request.json();
     
     if (!text || text.trim().length < 10) {
       return NextResponse.json(
@@ -18,7 +20,7 @@ export async function POST(request) {
 
     console.log("📝 Processing text:", text.substring(0, 100) + "...");
 
-    // Simple test prompt first
+    // Generate study materials with Gemini
     const prompt = `Create 3 study items from this lecture content. Return ONLY valid JSON in this exact format:
     {
       "materials": [
@@ -74,7 +76,6 @@ export async function POST(request) {
       console.log("✅ Successfully parsed JSON");
     } catch (parseError) {
       console.error("❌ JSON parse error:", parseError.message);
-      // Create fallback response
       parsedData = {
         materials: [
           {
@@ -95,10 +96,38 @@ export async function POST(request) {
 
     console.log(`🎉 Generated ${materialsWithIds.length} study materials`);
     
+    // Generate audio if requested
+    let audioBase64 = null;
+    let audioScript = null;
+    
+    if (generateAudio) {
+      try {
+        console.log("🎙️ Generating audio from study materials...");
+        
+        // Create audio script from materials using helper function
+        audioScript = createAudioScript(materialsWithIds);
+        console.log("📝 Audio script:", audioScript.substring(0, 100) + "...");
+        
+        // Generate audio using TTS client
+        const audioBuffer = await textToSpeech(audioScript);
+        audioBase64 = audioBuffer.toString('base64');
+        
+        console.log("✅ Audio generated successfully");
+      } catch (audioError) {
+        console.error("❌ Audio generation error:", audioError.message);
+        // Continue without audio
+      }
+    }
+    
     return NextResponse.json({
       success: true,
       materials: materialsWithIds,
-      rawResponse: geminiText.substring(0, 300) // Include for debugging
+      audio: audioBase64 ? {
+        base64: audioBase64,
+        script: audioScript,
+        mimeType: "audio/mpeg"
+      } : null,
+      rawResponse: geminiText.substring(0, 300)
     });
 
   } catch (error) {
@@ -119,7 +148,7 @@ export async function POST(request) {
 export async function GET() {
   return NextResponse.json({
     message: "StudyToks Generate API is running!",
-    instructions: "Send a POST request with JSON body: { text: 'your lecture content here' }",
+    instructions: "Send a POST request with JSON body: { text: 'your lecture content here', generateAudio: true }",
     status: "ready"
   });
 }
