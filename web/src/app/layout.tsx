@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { AntdRegistry } from "@ant-design/nextjs-registry";
 import "./globals.css";
+import 'antd/dist/reset.css';
 
 export const metadata: Metadata = {
   title: "HoyaHacks GEM",
