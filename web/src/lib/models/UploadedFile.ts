@@ -2,8 +2,8 @@ import mongoose from 'mongoose';
 
 /**
  * UploadedFile schema - user-uploaded learning materials
- * Stores metadata about files (PDF, video, image, etc.)
- * Actual file content stored in cloud storage, path reference here
+ * Stores metadata about files in Cloudflare R2
+ * _id generated automatically by MongoDB
  */
 const uploadedFileSchema = new mongoose.Schema(
   {
@@ -19,52 +19,51 @@ const uploadedFileSchema = new mongoose.Schema(
       ref: 'Topic',
       index: true,
     },
+    originalName: {
+      type: String,
+      required: true,
+      trim: true,
+    },
     filename: {
       type: String,
       required: true,
     },
-    originalName: {
-      type: String,
-      required: true,
-    },
-    fileType: {
-      type: String,
-      required: true,
-      enum: ['pdf', 'txt', 'video', 'image', 'document', 'other'],
-    },
     mimeType: {
       type: String,
-      default: 'application/octet-stream',
-    },
-    // Storage location (e.g., cloud storage path, URL)
-    storagePath: {
-      type: String,
       required: true,
     },
-    // File size in bytes
     size: {
       type: Number,
       required: true,
     },
-    // Optional metadata extracted from file
-    metadata: {
-      pageCount: Number,         // For PDFs
-      duration: Number,          // For videos (seconds)
-      width: Number,             // For images/videos
-      height: Number,            // For images/videos
-      textExtract: String,       // First N chars of text content
+    // Storage provider (always 'r2' for now)
+    storageProvider: {
+      type: String,
+      default: 'r2',
+      enum: ['r2'],
+    },
+    // R2 bucket name
+    bucket: {
+      type: String,
+      required: true,
+    },
+    // R2 object key (path in bucket)
+    key: {
+      type: String,
+      required: true,
+    },
+    // Full storage path (r2://bucket/key)
+    storagePath: {
+      type: String,
+      required: true,
     },
     createdAt: {
       type: Date,
       default: Date.now,
       index: true,
     },
-    updatedAt: {
-      type: Date,
-      default: Date.now,
-    },
   },
-  { collection: 'uploadedFiles', timestamps: true }
+  { collection: 'uploadedFiles', timestamps: false }
 );
 
 export const UploadedFile =

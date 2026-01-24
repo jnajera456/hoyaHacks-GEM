@@ -1,26 +1,26 @@
 import mongoose from 'mongoose';
 
 /**
- * User schema - represents authenticated users
- * Single source of truth for user identity and metadata
+ * User schema - represents authenticated users with passwordHash (bcryptjs)
+ * email is unique index for login; _id generated automatically by MongoDB
  */
 const userSchema = new mongoose.Schema(
   {
-    _id: mongoose.Schema.Types.ObjectId, // MongoDB default
     email: {
       type: String,
       required: true,
       unique: true,
       lowercase: true,
       index: true,
+      trim: true,
     },
     name: {
       type: String,
-      required: true,
+      default: '',
+      trim: true,
     },
-    // Simple auth: stored as plain text for hackathon demo
-    // In production, this should be hashed with bcryptjs
-    password: {
+    // Password hashed with bcryptjs
+    passwordHash: {
       type: String,
       required: true,
     },
@@ -29,12 +29,8 @@ const userSchema = new mongoose.Schema(
       default: Date.now,
       index: true,
     },
-    updatedAt: {
-      type: Date,
-      default: Date.now,
-    },
   },
-  { collection: 'users', timestamps: true }
+  { collection: 'users', timestamps: false }
 );
 
 export const User = mongoose.models.User || mongoose.model('User', userSchema);

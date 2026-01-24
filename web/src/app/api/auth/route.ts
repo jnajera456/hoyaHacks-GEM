@@ -1,33 +1,28 @@
-import { connectDB } from '@/lib/mongodb';
-import { User } from '@/lib/models/User';
-import bcryptjs from 'bcryptjs';
-import jwt from 'jsonwebtoken';
+/**
+ * Auth routes have been moved to dedicated endpoints:
+ * - POST /api/auth/register - Register new user
+ * - POST /api/auth/login - Login user
+ * - POST /api/auth/logout - Logout user
+ * - GET /api/auth/me - Get authenticated user profile
+ *
+ * This file is kept for reference only.
+ */
+
 import { NextRequest, NextResponse } from 'next/server';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
-
-/**
- * Authentication API routes
- * - POST /api/auth with action: 'signup' or 'signin'
- * Simplified for hackathon: plain text passwords accepted (not production)
- */
 export async function POST(request: NextRequest) {
-  try {
-    const body = await request.json();
-    const { action, email, password, name } = body;
+  return NextResponse.json(
+    {
+      error:
+        'Use dedicated endpoints: POST /api/auth/register, POST /api/auth/login, POST /api/auth/logout',
+    },
+    { status: 400 }
+  );
+}
+          { status: 400 }
+        );
+      }
 
-    // Validate input
-    if (!email || !password) {
-      return NextResponse.json(
-        { error: 'Email and password required' },
-        { status: 400 }
-      );
-    }
-
-    await connectDB();
-
-    if (action === 'signup') {
-      // Check if user exists
       const existingUser = await User.findOne({ email: email.toLowerCase() });
       if (existingUser) {
         return NextResponse.json(
@@ -36,17 +31,83 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // Hash password (for hackathon, plain text acceptable but we hash anyway)
-      const hashedPassword = await bcryptjs.hash(password, 10);
-
-      // Create new user with simplified schema
+      const passwordHash = await hashPassword(password);
       const user = new User({
         email: email.toLowerCase(),
-        name: name || email.split('@')[0],
-        password: hashedPassword,
+        name: name || '',
+        passwordHash,
       });
 
       await user.save();
+      const token = generateToken(user._id.toString());
+
+      const response = NextResponse.json(
+        {
+          user: {
+            id: user._id.toString(),
+            email: user.email,
+            name: user.name,
+          },
+        },
+        { status: 201 }
+      );
+
+      setTokenCookie(response, token);
+      return response;
+    }
+
+    // LOGIN
+    if (pathname.includes('/login')) {
+      const { email, password } = body;
+
+      if (!email || !password) {
+        return NextResponse.json(
+          { error: 'Email and password are required' },
+          { status: 400 }
+        );
+      }
+
+      const user = await User.findOne({ email: email.toLowerCase() });
+
+      if (!user) {
+        return NextResponse.json(
+          { error: 'Invalid email or password' },
+          { status: 401 }
+        );
+      }
+
+      const passwordMatch = await comparePassword(password, user.passwordHash);
+
+      if (!passwordMatch) {
+        return NextResponse.json(
+          { error: 'Invalid email or password' },
+          { status: 401 }
+        );
+      }
+
+      const token = generateToken(user._id.toString());
+
+      const response = NextResponse.json(
+        {
+          user: {
+            id: user._id.toString(),
+            email: user.email,
+            name: user.name,
+          },
+        },
+        { status: 200 }
+      );
+
+      setTokenCookie(response, token);
+      return response;
+    }
+
+    return NextResponse.json({ error: 'Invalid endpoint' }, { status: 400 });
+  } catch (error) {
+    console.error('Auth error:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
 
       // Generate JWT token
       const token = jwt.sign(

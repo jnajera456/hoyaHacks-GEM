@@ -21,26 +21,13 @@ const topicSchema = new mongoose.Schema(
       type: String,
       default: '',
     },
-    // Optional metadata
-    subject: {
-      type: String,
-      default: '',
-    },
-    tags: {
-      type: [String],
-      default: [],
-    },
     createdAt: {
       type: Date,
       default: Date.now,
       index: true,
     },
-    updatedAt: {
-      type: Date,
-      default: Date.now,
-    },
   },
-  { collection: 'topics', timestamps: true }
+  { collection: 'topics', timestamps: false }
 );
 
 export const Topic = mongoose.models.Topic || mongoose.model('Topic', topicSchema);

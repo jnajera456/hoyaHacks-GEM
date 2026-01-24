@@ -1,61 +1,83 @@
-import { NextResponse } from "next/server";
-import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
-import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
-import crypto from "crypto";
+import { connectDB } from '@/lib/mongodb';
+import { Topic } from '@/lib/models/Topic';
+import { getTokenFromRequest, verifyToken } from '@/lib/auth';
+import {
+  generatePresignedPutUrl,
+  generateR2Filename,
+  buildStoragePath,
+} from '@/lib/r2';
+import { NextRequest, NextResponse } from 'next/server';
 
-const s3 = new S3Client({
-  region: "auto",
-  endpoint: process.env.R2_ENDPOINT,
-  credentials: {
-    accessKeyId: (process.env.R2_ACCESS_KEY_ID || "").trim(),
-    secretAccessKey: (process.env.R2_SECRET_ACCESS_KEY || "").trim(),
-  },
-
-  // IMPORTANT: disable new default S3 integrity/checksum behavior
-  // that can break non-AWS S3 backends like R2
-  requestChecksumCalculation: "WHEN_REQUIRED",
-  responseChecksumValidation: "WHEN_REQUIRED",
-});
-
-function sanitize(name: string) {
-  return name.replace(/[^a-zA-Z0-9._-]/g, "_");
-}
-
-export async function POST(req: Request) {
+/**
+ * POST /api/uploads/presign
+ * Generate a presigned PUT URL for file upload to R2
+ * Body: { topicId, originalName, mimeType, size }
+ * Returns: { uploadUrl, key, storagePath, filename }
+ */
+export async function POST(request: NextRequest) {
   try {
-    const { topicId, originalName, mimeType } = await req.json();
+    const token = getTokenFromRequest(request);
 
-    if (!topicId || !originalName || !mimeType) {
+    if (!token) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const decoded = verifyToken(token);
+
+    if (!decoded) {
+      return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
+    }
+
+    const { topicId, originalName, mimeType, size } = await request.json();
+
+    if (!topicId || !originalName || !mimeType || size === undefined) {
       return NextResponse.json(
-        { error: "topicId, originalName, mimeType required" },
+        { error: 'Missing required fields: topicId, originalName, mimeType, size' },
         { status: 400 }
       );
     }
 
-    const id = crypto.randomUUID();
-    const safeName = sanitize(originalName);
-    const key = `topics/${topicId}/${id}-${safeName}`;
+    // Validate topic belongs to user
+    await connectDB();
 
-    const command = new PutObjectCommand({
-      Bucket: process.env.R2_BUCKET,
-      Key: key,
-      ContentType: mimeType,
+    const topic = await Topic.findOne({
+      _id: topicId,
+      userId: decoded.userId,
     });
 
-    const uploadUrl = await getSignedUrl(s3, command, {
-      expiresIn: 60 * 5, // 5 minutes
-    });
+    if (!topic) {
+      return NextResponse.json(
+        { error: 'Topic not found' },
+        { status: 404 }
+      );
+    }
 
-    return NextResponse.json({
-      uploadUrl,
-      storagePath: `r2://${process.env.R2_BUCKET}/${key}`,
-      filename: `${id}-${safeName}`,
-      key,
-    });
-  } catch (err: any) {
+    const bucket = process.env.R2_BUCKET;
+    if (!bucket) {
+      return NextResponse.json(
+        { error: 'R2 bucket not configured' },
+        { status: 500 }
+      );
+    }
+
+    // Generate R2 filename and presigned URL
+    const key = generateR2Filename(topicId, originalName);
+    const uploadUrl = await generatePresignedPutUrl(bucket, key, mimeType);
+    const storagePath = buildStoragePath(bucket, key);
+
+    console.log(`Generated presigned PUT URL for ${originalName} -> ${key}`);
+
     return NextResponse.json(
-      { error: err?.message ?? "Presign failed" },
-      { status: 500 }
+      {
+        uploadUrl,
+        key,
+        storagePath,
+        filename: key.split('/').pop(),
+      },
+      { status: 200 }
     );
+  } catch (error) {
+    console.error('Presign error:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

@@ -1,37 +1,29 @@
 import { connectDB } from '@/lib/mongodb';
 import { Topic } from '@/lib/models/Topic';
+import { UploadedFile } from '@/lib/models/UploadedFile';
+import { getTokenFromRequest, verifyToken } from '@/lib/auth';
+import { deleteFromR2 } from '@/lib/r2';
 import { NextRequest, NextResponse } from 'next/server';
-import jwt from 'jsonwebtoken';
-
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
-
-function verifyToken(token: string) {
-  try {
-    return jwt.verify(token, JWT_SECRET) as any;
-  } catch (error) {
-    return null;
-  }
-}
 
 /**
- * GET /api/topics/[id] - Get a specific topic
- * Returns: Topic details
+ * GET /api/topics/:id
+ * Get single topic (verify user owns it)
  */
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { id } = await params;
   try {
-    const authHeader = request.headers.get('authorization');
-    const token = authHeader?.split(' ')[1];
+    const { id } = await params;
+    const token = getTokenFromRequest(request);
 
     if (!token) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const decoded = verifyToken(token);
-    if (!decoded || !decoded.userId) {
+
+    if (!decoded) {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
@@ -39,27 +31,16 @@ export async function GET(
 
     const topic = await Topic.findOne({
       _id: id,
-      userId: decoded.userId, // Ensure user owns this topic
-    }).lean();
+      userId: decoded.userId,
+    });
 
     if (!topic) {
-      return NextResponse.json(
-        { error: 'Topic not found' },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: 'Topic not found' }, { status: 404 });
     }
 
-    return NextResponse.json({
-      topic: {
-        id: topic._id.toString(),
-        title: topic.title,
-        description: topic.description,
-        subject: topic.subject,
-        tags: topic.tags,
-        createdAt: topic.createdAt,
-        updatedAt: topic.updatedAt,
-      },
-    });
+    console.log(`Retrieved topic: ${id}`);
+
+    return NextResponse.json({ topic });
   } catch (error) {
     console.error('Get topic error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
@@ -67,65 +48,53 @@ export async function GET(
 }
 
 /**
- * PUT /api/topics/[id] - Update a topic
- * Body: { title?, description?, subject?, tags? }
- * Returns: Updated topic
+ * PATCH /api/topics/:id
+ * Update topic (verify user owns it)
  */
-export async function PUT(
+export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { id } = await params;
   try {
-    const authHeader = request.headers.get('authorization');
-    const token = authHeader?.split(' ')[1];
+    const { id } = await params;
+    const token = getTokenFromRequest(request);
 
     if (!token) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const decoded = verifyToken(token);
-    if (!decoded || !decoded.userId) {
+
+    if (!decoded) {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
-    const body = await request.json();
+    const { title, description } = await request.json();
+
     await connectDB();
 
-    const updateData: any = {};
-    if (body.title !== undefined) updateData.title = body.title;
-    if (body.description !== undefined) updateData.description = body.description;
-    if (body.subject !== undefined) updateData.subject = body.subject;
-    if (body.tags !== undefined) updateData.tags = body.tags;
-    updateData.updatedAt = new Date();
-
-    const topic = await Topic.findOneAndUpdate(
-      {
-        _id: id,
-        userId: decoded.userId, // Ensure user owns this topic
-      },
-      updateData,
-      { new: true }
-    ).lean();
+    const topic = await Topic.findOne({
+      _id: id,
+      userId: decoded.userId,
+    });
 
     if (!topic) {
-      return NextResponse.json(
-        { error: 'Topic not found' },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: 'Topic not found' }, { status: 404 });
     }
 
-    return NextResponse.json({
-      topic: {
-        id: topic._id.toString(),
-        title: topic.title,
-        description: topic.description,
-        subject: topic.subject,
-        tags: topic.tags,
-        createdAt: topic.createdAt,
-        updatedAt: topic.updatedAt,
-      },
-    });
+    if (title !== undefined) {
+      topic.title = title;
+    }
+
+    if (description !== undefined) {
+      topic.description = description;
+    }
+
+    await topic.save();
+
+    console.log(`Updated topic: ${id}`);
+
+    return NextResponse.json({ topic });
   } catch (error) {
     console.error('Update topic error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
@@ -133,44 +102,66 @@ export async function PUT(
 }
 
 /**
- * DELETE /api/topics/[id] - Delete a topic
- * Returns: Success confirmation
+ * DELETE /api/topics/:id
+ * Delete topic and all associated files from R2 and MongoDB
  */
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { id } = await params;
   try {
-    const authHeader = request.headers.get('authorization');
-    const token = authHeader?.split(' ')[1];
+    const { id } = await params;
+    const token = getTokenFromRequest(request);
 
     if (!token) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const decoded = verifyToken(token);
-    if (!decoded || !decoded.userId) {
+
+    if (!decoded) {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
     await connectDB();
 
-    const topic = await Topic.findOneAndDelete({
+    const topic = await Topic.findOne({
       _id: id,
-      userId: decoded.userId, // Ensure user owns this topic
+      userId: decoded.userId,
     });
 
     if (!topic) {
-      return NextResponse.json(
-        { error: 'Topic not found' },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: 'Topic not found' }, { status: 404 });
     }
 
-    return NextResponse.json({
-      message: 'Topic deleted successfully',
+    // Find all files for this topic
+    const files = await UploadedFile.find({
+      topicId: id,
+      userId: decoded.userId,
     });
+
+    // Delete all files from R2 (best-effort)
+    for (const file of files) {
+      try {
+        await deleteFromR2(file.bucket, file.key);
+      } catch (err) {
+        console.error(`Failed to delete file from R2: ${file.key}`, err);
+        // Continue deleting others
+      }
+    }
+
+    // Delete all file metadata from MongoDB
+    await UploadedFile.deleteMany({
+      topicId: id,
+      userId: decoded.userId,
+    });
+
+    // Delete topic
+    await Topic.deleteOne({ _id: id });
+
+    console.log(`Deleted topic: ${id} and ${files.length} associated files`);
+
+    return NextResponse.json({ message: 'Topic deleted' });
   } catch (error) {
     console.error('Delete topic error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

@@ -6,10 +6,9 @@ import { Topic } from "../src/lib/models/Topic";
 import { UploadedFile } from "../src/lib/models/UploadedFile";
 import { GeneratedContent } from "../src/lib/models/GeneratedContent";
 
-// QUICK MODE: put your URI here (since you said you want fast)
-// Prefer env vars later.
-const MONGODB_URI =
-  "mongodb+srv://ec1272_dev_test:2004Diana@hoyahacks2026cluster.6frmchi.mongodb.net/?appName=HoyaHacks2026Cluster";
+import "dotenv/config";
+
+const MONGODB_URI = process.env.MONGODB_URI;
 
 function ensureIdIfNeeded(model: any, doc: any) {
   // If schema disables _id, Mongoose won't generate it; we provide one.

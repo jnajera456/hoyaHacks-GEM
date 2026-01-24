@@ -1,74 +1,51 @@
 import { connectDB } from '@/lib/mongodb';
 import { UploadedFile } from '@/lib/models/UploadedFile';
 import { Topic } from '@/lib/models/Topic';
+import { getTokenFromRequest, verifyToken } from '@/lib/auth';
 import { NextRequest, NextResponse } from 'next/server';
-import jwt from 'jsonwebtoken';
-
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
-
-function verifyToken(token: string) {
-  try {
-    return jwt.verify(token, JWT_SECRET) as any;
-  } catch (error) {
-    return null;
-  }
-}
 
 /**
- * GET /api/topics/[id]/files - List all uploaded files for a topic
- * Returns: Array of file metadata (id, filename, fileType, size, createdAt)
+ * GET /api/topics/:id/files
+ * List all files for a topic (verify user owns topic)
  */
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { id } = await params;
   try {
-    const authHeader = request.headers.get('authorization');
-    const token = authHeader?.split(' ')[1];
+    const { id } = await params;
+    const token = getTokenFromRequest(request);
 
     if (!token) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const decoded = verifyToken(token);
-    if (!decoded || !decoded.userId) {
+
+    if (!decoded) {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
     await connectDB();
 
-    // Verify topic exists and belongs to user
+    // Verify user owns topic
     const topic = await Topic.findOne({
       _id: id,
       userId: decoded.userId,
     });
 
     if (!topic) {
-      return NextResponse.json(
-        { error: 'Topic not found' },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: 'Topic not found' }, { status: 404 });
     }
 
     const files = await UploadedFile.find({
       topicId: id,
-      userId: decoded.userId, // Double-check user owns these files
-    })
-      .sort({ createdAt: -1 })
-      .lean();
+      userId: decoded.userId,
+    }).sort({ createdAt: -1 });
 
-    return NextResponse.json({
-      files: files.map(file => ({
-        id: file._id.toString(),
-        filename: file.filename,
-        originalName: file.originalName,
-        fileType: file.fileType,
-        mimeType: file.mimeType,
-        size: file.size,
-        createdAt: file.createdAt,
-      })),
-    });
+    console.log(`Retrieved ${files.length} files for topic ${id}`);
+
+    return NextResponse.json({ files });
   } catch (error) {
     console.error('Get topic files error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
@@ -76,51 +53,39 @@ export async function GET(
 }
 
 /**
- * POST /api/topics/[id]/files - Create file metadata entry (file storage handled separately)
- * Body: {
- *   originalName: string,
- *   filename: string,
- *   fileType: 'pdf' | 'txt' | 'video' | 'image' | 'document' | 'other',
- *   mimeType: string,
- *   storagePath: string,
- *   size: number,
- *   metadata?: { pageCount?, duration?, width?, height?, textExtract? }
- * }
- * Returns: Created file metadata
- *
- * Note: Actual file upload happens via separate file upload service
- * This endpoint only creates the metadata record for tracking
+ * POST /api/topics/:id/files
+ * Create file metadata entry after R2 upload
+ * Body: { originalName, filename, mimeType, size, bucket, key, storagePath }
  */
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { id } = await params;
   try {
-    const authHeader = request.headers.get('authorization');
-    const token = authHeader?.split(' ')[1];
+    const { id } = await params;
+    const token = getTokenFromRequest(request);
 
     if (!token) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const decoded = verifyToken(token);
-    if (!decoded || !decoded.userId) {
+
+    if (!decoded) {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
     const {
       originalName,
       filename,
-      fileType,
       mimeType,
-      storagePath,
       size,
-      metadata,
+      bucket,
+      key,
+      storagePath,
     } = await request.json();
 
-    // Validate required fields
-    if (!originalName || !filename || !fileType || !storagePath || !size) {
+    if (!originalName || !filename || !bucket || !key || !storagePath) {
       return NextResponse.json(
         { error: 'Missing required file metadata fields' },
         { status: 400 }
@@ -129,17 +94,14 @@ export async function POST(
 
     await connectDB();
 
-    // Verify topic exists and belongs to user
+    // Verify user owns topic
     const topic = await Topic.findOne({
       _id: id,
       userId: decoded.userId,
     });
 
     if (!topic) {
-      return NextResponse.json(
-        { error: 'Topic not found' },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: 'Topic not found' }, { status: 404 });
     }
 
     // Create file metadata record
@@ -148,30 +110,19 @@ export async function POST(
       topicId: id,
       originalName,
       filename,
-      fileType,
       mimeType,
-      storagePath,
       size,
-      metadata: metadata || {},
+      storageProvider: 'r2',
+      bucket,
+      key,
+      storagePath,
     });
 
     await uploadedFile.save();
 
-    return NextResponse.json(
-      {
-        file: {
-          id: uploadedFile._id.toString(),
-          filename: uploadedFile.filename,
-          originalName: uploadedFile.originalName,
-          fileType: uploadedFile.fileType,
-          mimeType: uploadedFile.mimeType,
-          size: uploadedFile.size,
-          storagePath: uploadedFile.storagePath,
-          createdAt: uploadedFile.createdAt,
-        },
-      },
-      { status: 201 }
-    );
+    console.log(`Created file metadata: ${uploadedFile._id}`);
+
+    return NextResponse.json({ file: uploadedFile }, { status: 201 });
   } catch (error) {
     console.error('Create file metadata error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
