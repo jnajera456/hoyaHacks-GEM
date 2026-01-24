@@ -4,6 +4,7 @@ import { Layout, Typography, Space, Card, Button, Upload, Divider, Input, messag
 import { UploadOutlined, FilePdfOutlined, VideoCameraOutlined, FileTextOutlined, CloseOutlined, CheckCircleOutlined, SaveOutlined } from "@ant-design/icons";
 import { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { FileParser, FileParseResult } from '@/utils/fileParser';
 
 const { Header, Content, Footer } = Layout;
@@ -178,12 +179,13 @@ export default function Home() {
   };
 
   return (
-    <Layout style={{ minHeight: "100vh" }}>
-      <Header style={{ display: "flex", alignItems: "center" }}>
-        <Title level={4} style={{ color: "white", margin: 0 }}>
-          StudyToks - AI Study Assistant
-        </Title>
-      </Header>
+    <ProtectedRoute>
+      <Layout style={{ minHeight: "100vh" }}>
+        <Header style={{ display: "flex", alignItems: "center" }}>
+          <Title level={4} style={{ color: "white", margin: 0 }}>
+            StudyToks - AI Study Assistant
+          </Title>
+        </Header>
 
       <Content style={{ padding: 16, maxWidth: 520, width: "100%", margin: "0 auto" }}>
         <Space orientation="vertical" size="large" style={{ width: "100%", marginTop: 8 }}>
@@ -383,6 +385,7 @@ export default function Home() {
           Upload files or paste text • Powered by Gemini AI
         </Text>
       </Footer>
-    </Layout>
+      </Layout>
+    </ProtectedRoute>
   );
 }

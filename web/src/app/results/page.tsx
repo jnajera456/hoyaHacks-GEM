@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { ProtectedRoute } from '@/components/ProtectedRoute';
 
 interface StudyMaterial {
   type: 'flashcard' | 'summary' | 'concept';
@@ -168,15 +169,16 @@ export default function ResultsPage() {
   };
 
   return (
-    <div 
-      ref={containerRef}
-      style={{
-        position: 'relative',
-        width: '100%',
-        height: '100vh',
-        backgroundColor: '#000',
-        overflow: 'hidden'
-      }}
+    <ProtectedRoute>
+      <div 
+        ref={containerRef}
+        style={{
+          position: 'relative',
+          width: '100%',
+          height: '100vh',
+          backgroundColor: '#000',
+          overflow: 'hidden'
+        }}
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
@@ -439,6 +441,7 @@ export default function ResultsPage() {
           }
         }
       `}</style>
-    </div>
+      </div>
+    </ProtectedRoute>
   );
 }

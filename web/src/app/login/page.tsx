@@ -1,6 +1,7 @@
 'use client';
-import { Button, Checkbox, Form, Input, Layout, Typography } from 'antd';
+import { Button, Checkbox, Form, Input, Layout, Typography, message } from 'antd';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import styles from './login.module.css';
 
 const { Content } = Layout;
@@ -13,9 +14,11 @@ interface LoginValues {
 }
 
 const LoginPage = () => {
+  const router = useRouter();
+
   const onFinish = async (values: LoginValues) => {
     try {
-      const response = await fetch('/api/login', {
+      const response = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(values),
@@ -23,12 +26,13 @@ const LoginPage = () => {
   
       const data = await response.json();
       if (response.ok) {
-        alert("Success: " + data.message);
+        message.success('Login successful!');
+        router.push('/account');
       } else {
-        alert("Error: " + data.message);
+        message.error(data.error || 'Login failed');
       }
     } catch (error) {
-      console.error("Failed to connect to the server", error);
+      message.error('Connection error. Please try again.');
     }
   };
 

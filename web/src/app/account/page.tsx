@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useAuth } from '@/hooks/useAuth';
+import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { 
   User, 
   BookOpen, 
@@ -81,6 +83,7 @@ type StudySession = {
 };
 
 export default function AccountPage() {
+  const { user: authUser, logout } = useAuth();
   const [user, setUser] = useState<UserType | null>(null);
   const [userDecks, setUserDecks] = useState<GeneratedDeck[]>([]);
   const [studySessions, setStudySessions] = useState<StudySession[]>([]);
@@ -96,31 +99,14 @@ export default function AccountPage() {
     language: 'en'
   });
 
-  // Load user, decks, and study history from localStorage
+  // Initialize user from auth context
   useEffect(() => {
-    const savedUser = localStorage.getItem('studytoks_user');
-    const savedDecks = localStorage.getItem('studyDecks'); // KEY CHANGE: 'studyDecks' not 'studytoks_decks'
-    
-    if (savedUser) {
-      const userData = JSON.parse(savedUser);
-      setUser(userData);
-      setEditForm({
-        name: userData.name,
-        email: userData.email,
-        theme: userData.preferences?.theme || 'light',
-        notifications: userData.preferences?.notifications !== false,
-        dailyReminder: userData.preferences?.dailyReminder !== false,
-        studyGoal: userData.preferences?.studyGoal || 30,
-        language: userData.preferences?.language || 'en'
-      });
-    } else {
-      // Auto-create guest user if none exists
-      const guestUser: UserType = {
-        id: 'guest_' + Date.now(),
-        name: 'Guest User',
-        email: 'guest@studytoks.com',
-        isGuest: true,
-        avatarColor: '#6B7280',
+    if (authUser) {
+      const userData: UserType = {
+        id: authUser.id,
+        name: authUser.name || 'User',
+        email: authUser.email,
+        avatarColor: '#7C3AED',
         preferences: {
           theme: 'light',
           notifications: true,
@@ -137,11 +123,10 @@ export default function AccountPage() {
           totalFlashcards: 0
         }
       };
-      localStorage.setItem('studytoks_user', JSON.stringify(guestUser));
-      setUser(guestUser);
+      setUser(userData);
       setEditForm({
-        name: guestUser.name,
-        email: guestUser.email,
+        name: userData.name,
+        email: userData.email,
         theme: 'light',
         notifications: true,
         dailyReminder: true,
@@ -149,6 +134,11 @@ export default function AccountPage() {
         language: 'en'
       });
     }
+  }, [authUser]);
+
+  // Load decks and study sessions from localStorage
+  useEffect(() => {
+    const savedDecks = localStorage.getItem('studyDecks');
     
     if (savedDecks) {
       try {
@@ -160,16 +150,18 @@ export default function AccountPage() {
           const totalFlashcards = decks.reduce((total: number, deck: GeneratedDeck) => 
             total + deck.materials.filter(m => m.type === 'flashcard').length, 0);
           
-          const updatedUser = {
+          const updatedUser: UserType = {
             ...user,
             studyStats: {
-              ...user.studyStats,
+              totalStudyTime: user.studyStats?.totalStudyTime || 0,
+              daysStudied: user.studyStats?.daysStudied || 0,
+              longestStreak: user.studyStats?.longestStreak || 0,
+              averageScore: user.studyStats?.averageScore || 0,
               totalDecks: decks.length,
               totalFlashcards: totalFlashcards
             }
           };
           setUser(updatedUser);
-          localStorage.setItem('studytoks_user', JSON.stringify(updatedUser));
         }
       } catch (error) {
         console.error('Error parsing decks:', error);
@@ -181,38 +173,10 @@ export default function AccountPage() {
     if (savedSessions) {
       setStudySessions(JSON.parse(savedSessions));
     }
-  }, []);
+  }, [user]);
 
-  const handleSignIn = () => {
-    const demoUser: UserType = {
-      id: 'demo_' + Date.now(),
-      name: 'Demo Student',
-      email: 'demo@studytoks.com',
-      avatarColor: '#7C3AED',
-      preferences: {
-        theme: 'light',
-        notifications: true,
-        dailyReminder: true,
-        studyGoal: 30,
-        language: 'en'
-      },
-      studyStats: {
-        totalStudyTime: 1250,
-        daysStudied: 45,
-        longestStreak: 14,
-        averageScore: 82,
-        totalDecks: userDecks.length,
-        totalFlashcards: userDecks.reduce((total, deck) => 
-          total + deck.materials.filter(m => m.type === 'flashcard').length, 0)
-      }
-    };
-    localStorage.setItem('studytoks_user', JSON.stringify(demoUser));
-    setUser(demoUser);
-  };
-
-  const handleSignOut = () => {
-    localStorage.removeItem('studytoks_user');
-    setUser(null);
+  const handleSignOut = async () => {
+    await logout();
   };
 
   const handleSavePreferences = () => {
@@ -247,10 +211,13 @@ export default function AccountPage() {
         const totalFlashcards = updated.reduce((total: number, deck: GeneratedDeck) => 
           total + deck.materials.filter(m => m.type === 'flashcard').length, 0);
         
-        const updatedUser = {
+        const updatedUser: UserType = {
           ...user,
           studyStats: {
-            ...user.studyStats,
+            totalStudyTime: user.studyStats?.totalStudyTime || 0,
+            daysStudied: user.studyStats?.daysStudied || 0,
+            longestStreak: user.studyStats?.longestStreak || 0,
+            averageScore: user.studyStats?.averageScore || 0,
             totalDecks: updated.length,
             totalFlashcards: totalFlashcards
           }
@@ -335,31 +302,34 @@ export default function AccountPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white border-b border-gray-200 sticky top-0 z-50 px-4 py-4 shadow-sm sm:px-6 lg:px-8">
-        <div className="max-w-7xl mx-auto flex justify-between items-center">
-          <div className="flex items-center space-x-4">
-            <Link href="/" className="text-gray-600 hover:text-gray-900 flex items-center">
-              <span className="mr-2">←</span> Back to Home
-            </Link>
-            <h1 className="text-2xl font-bold text-gray-900">My Study Decks</h1>
+    <ProtectedRoute>
+      <div className="min-h-screen bg-gray-50">
+        {/* Header */}
+        <header className="bg-white border-b border-gray-200 sticky top-0 z-50 px-4 py-4 shadow-sm sm:px-6 lg:px-8">
+          <div className="max-w-7xl mx-auto flex justify-between items-center">
+            <div className="flex items-center space-x-4">
+              <Link href="/" className="text-gray-600 hover:text-gray-900 flex items-center">
+                <span className="mr-2">←</span> Back to Home
+              </Link>
+              <h1 className="text-2xl font-bold text-gray-900">My Study Decks</h1>
+            </div>
+            {user && (
+              <button
+                onClick={handleSignOut}
+                className="px-4 py-2 bg-red-50 text-red-700 border border-red-200 rounded-lg hover:bg-red-100 flex items-center space-x-2 transition-colors"
+              >
+                <LogOut size={18} />
+                <span>Sign Out</span>
+              </button>
+            )}
           </div>
-          {user && (
-            <button
-              onClick={handleSignOut}
-              className="px-4 py-2 bg-red-50 text-red-700 border border-red-200 rounded-lg hover:bg-red-100 flex items-center space-x-2 transition-colors"
-            >
-              <LogOut size={18} />
-              <span>Sign Out</span>
-            </button>
-          )}
-        </div>
-      </header>
+        </header>
 
       <main className="container mx-auto px-4 py-8 sm:px-6 lg:px-8">
-        {user ? (
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 md:gap-8">
+        {!user ? (
+          <div className="text-center py-12">Loading...</div>
+        ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 md:gap-8">
             {/* Left Sidebar - Profile & Navigation */}
             <div className="lg:col-span-1 space-y-6">
               {/* Profile Card */}
@@ -980,60 +950,7 @@ export default function AccountPage() {
                 </div>
               )}
             </div>
-          </div>
-        ) : (
-          /* Not Signed In View */
-          <div className="max-w-md mx-auto">
-            <div className="bg-white border border-gray-200 rounded-xl p-8 text-center shadow-sm">
-              <div className="w-20 h-20 rounded-full bg-gradient-to-r from-purple-600 to-blue-600 flex items-center justify-center mx-auto mb-6">
-                <User className="text-white" size={32} />
-              </div>
-              <h2 className="text-2xl font-bold text-gray-900 mb-4">Welcome to StudyToks!</h2>
-              <p className="text-gray-600 mb-8">
-                Sign in to save your study decks, track progress across devices, and unlock personalized features.
-              </p>
-              
-              <div className="space-y-4">
-                <button
-                  onClick={handleSignIn}
-                  className="w-full py-3 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg hover:opacity-90 font-medium flex items-center justify-center space-x-2"
-                >
-                  <User size={20} />
-                  <span>Sign In with Demo Account</span>
-                </button>
-                
-                <button
-                  onClick={() => {
-                    const guestUser: UserType = {
-                      id: 'guest_' + Date.now(),
-                      name: 'Guest User',
-                      email: 'guest@studytoks.com',
-                      isGuest: true,
-                      avatarColor: '#6B7280'
-                    };
-                    localStorage.setItem('studytoks_user', JSON.stringify(guestUser));
-                    setUser(guestUser);
-                  }}
-                  className="w-full py-3 border border-purple-600 text-purple-600 rounded-lg hover:bg-purple-50 flex items-center justify-center space-x-2"
-                >
-                  <span>Continue as Guest</span>
-                </button>
-                
-                <Link 
-                  href="/" 
-                  className="block w-full py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
-                >
-                  Back to Home
-                </Link>
-              </div>
-              
-              <div className="mt-8 pt-6 border-t border-gray-200">
-                <p className="text-sm text-gray-500">
-                  Data is stored locally in your browser. Sign in to access from multiple devices.
-                </p>
-              </div>
-            </div>
-          </div>
+        </div>
         )}
       </main>
 
@@ -1051,6 +968,7 @@ export default function AccountPage() {
           </div>
         </div>
       </footer>
-    </div>
+      </div>
+    </ProtectedRoute>
   );
 }
