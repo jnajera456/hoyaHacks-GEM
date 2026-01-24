@@ -2,6 +2,7 @@ import { connectDB } from '@/lib/mongodb';
 import { UploadedFile } from '@/lib/models/UploadedFile';
 import { Topic } from '@/lib/models/Topic';
 import { getTokenFromRequest, verifyToken } from '@/lib/auth';
+import { buildStoragePath } from '@/lib/r2';
 import { NextRequest, NextResponse } from 'next/server';
 
 /**
@@ -85,7 +86,7 @@ export async function POST(
       storagePath,
     } = await request.json();
 
-    if (!originalName || !filename || !bucket || !key || !storagePath) {
+    if (!originalName || !filename || !mimeType || size === undefined || !key) {
       return NextResponse.json(
         { error: 'Missing required file metadata fields' },
         { status: 400 }
@@ -104,6 +105,17 @@ export async function POST(
       return NextResponse.json({ error: 'Topic not found' }, { status: 404 });
     }
 
+    const envBucket = process.env.R2_BUCKET;
+    const resolvedBucket = bucket || envBucket;
+    if (!resolvedBucket) {
+      return NextResponse.json(
+        { error: 'R2 bucket not configured' },
+        { status: 500 }
+      );
+    }
+
+    const resolvedStoragePath = storagePath || buildStoragePath(resolvedBucket, key);
+
     // Create file metadata record
     const uploadedFile = new UploadedFile({
       userId: decoded.userId,
@@ -113,9 +125,9 @@ export async function POST(
       mimeType,
       size,
       storageProvider: 'r2',
-      bucket,
+      bucket: resolvedBucket,
       key,
-      storagePath,
+      storagePath: resolvedStoragePath,
     });
 
     await uploadedFile.save();

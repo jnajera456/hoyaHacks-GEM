@@ -7,7 +7,8 @@ let r2Client: S3Client | null = null;
 function getR2Client(): S3Client {
   if (r2Client) return r2Client;
 
-  const endpoint = process.env.R2_ENDPOINT;
+  // Cloudflare R2 wants the account-level endpoint (https://<ACCOUNT_ID>.r2.cloudflarestorage.com)
+  const endpoint = process.env.R2_ENDPOINT?.replace(/\/$/, '');
   const accessKeyId = process.env.R2_ACCESS_KEY_ID;
   const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY;
 
@@ -18,6 +19,7 @@ function getR2Client(): S3Client {
   r2Client = new S3Client({
     region: 'auto',
     endpoint,
+    forcePathStyle: true, // R2 is path-style friendly and this avoids signature mismatches
     credentials: {
       accessKeyId,
       secretAccessKey,

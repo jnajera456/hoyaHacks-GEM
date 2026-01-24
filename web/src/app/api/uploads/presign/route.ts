@@ -70,6 +70,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         uploadUrl,
+        bucket,
         key,
         storagePath,
         filename: key.split('/').pop(),
