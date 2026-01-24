@@ -8,9 +8,15 @@ export async function POST(request) {
 
     console.log("Login attempt for:", email);
 
-    // 2. This is where you would normally check your database
-    // For now, we will simulate a successful check
-    if (email === "test@example.com" && password === "password123") {
+    // 2. Check against the credentials you just created in your signup test
+    if (email === "janedoe@gmail.com" && password === "123456") {
+      return NextResponse.json(
+        { message: "Login Successful" },
+        { status: 200 }
+      );
+    }
+    // You can keep the old test account as an "else if" if you want
+    else if (email === "test@example.com" && password === "password123") {
       return NextResponse.json(
         { message: "Login Successful" },
         { status: 200 }
