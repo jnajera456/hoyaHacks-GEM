@@ -72,7 +72,6 @@ export default function AccountPage() {
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [editForm, setEditForm] = useState({
     name: '',
-    email: '',
     theme: 'light' as 'light' | 'dark' | 'auto',
     notifications: true,
     dailyReminder: true,
@@ -91,7 +90,6 @@ export default function AccountPage() {
           setEditForm((prev) => ({
             ...prev,
             name: me.user.name || '',
-            email: me.user.email,
           }));
         }
         // decks
@@ -108,12 +106,23 @@ export default function AccountPage() {
     load();
   }, []);
 
-  const handleSignOut = async () => {
+  const handleSaveProfile = async () => {
     try {
-      await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
-    } finally {
-      setUser(null);
-      window.location.href = '/login';
+      const res = await fetch('/api/users', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ name: editForm.name })
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        setUser((prev) => prev ? { ...prev, name: updated.name } : prev);
+        setIsEditingProfile(false);
+      } else {
+        console.error('Failed to update profile');
+      }
+    } catch (e) {
+      console.error('Error updating profile', e);
     }
   };
 
@@ -123,7 +132,6 @@ export default function AccountPage() {
     const updatedUser: UserType = {
       ...user,
       name: editForm.name,
-      email: editForm.email,
       preferences: {
         theme: editForm.theme,
         notifications: editForm.notifications,
@@ -217,38 +225,7 @@ export default function AccountPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
-      {/* Header */}
-      <header className="sticky top-0 z-50 w-full border-b border-gray-200 bg-white/80 backdrop-blur-sm px-4 py-3">
-        <div className="mx-auto max-w-7xl flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Link 
-              href="/" 
-              className="flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors"
-            >
-              <Home size={20} />
-              <span className="font-medium">Home</span>
-            </Link>
-            <div className="h-6 w-px bg-gray-300" />
-            <h1 className="text-xl font-bold text-gray-900">My Study Decks</h1>
-          </div>
-          
-          {user && (
-            <div className="flex items-center gap-3">
-              <div className="hidden sm:flex flex-col items-end">
-                <span className="text-sm font-medium text-gray-900">{user.name}</span>
-                <span className="text-xs text-gray-500">{user.email}</span>
-              </div>
-              <button
-                onClick={handleSignOut}
-                className="flex items-center gap-2 rounded-lg bg-red-50 px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-100 transition-colors"
-              >
-                <LogOut size={18} />
-                <span className="hidden sm:inline">Sign Out</span>
-              </button>
-            </div>
-          )}
-        </div>
-      </header>
+      {/* Global Navbar is rendered via layout; removed duplicate header */}
 
       {/* Main Content */}
       <main className="mx-auto w-full max-w-7xl px-4 py-8">
@@ -276,16 +253,10 @@ export default function AccountPage() {
                           className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 focus:outline-none"
                           placeholder="Your name"
                         />
-                        <input
-                          type="email"
-                          value={editForm.email}
-                          onChange={(e) => setEditForm({...editForm, email: e.target.value})}
-                          className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 focus:outline-none"
-                          placeholder="Email"
-                        />
+                        {/* Email editing disabled: email is immutable */}
                         <div className="flex gap-2">
                           <button
-                            onClick={handleSavePreferences}
+                            onClick={handleSaveProfile}
                             className="flex-1 rounded-lg bg-purple-600 px-4 py-2 font-medium text-white hover:bg-purple-700 flex items-center justify-center gap-2 transition-colors"
                           >
                             <Save size={18} />

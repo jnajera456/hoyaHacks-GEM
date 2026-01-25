@@ -19,9 +19,9 @@ export async function POST(request) {
     await connectDB();
     await autoBootstrap();
 
-    const { text, fileContent, fileName, fileType } = await request.json();
+    const { text, fileName, fileType } = await request.json();
 
-    if (!text && !fileContent) {
+    if (!text) {
       return NextResponse.json(
         {
           success: false,
@@ -31,37 +31,51 @@ export async function POST(request) {
       );
     }
 
-    const contentToProcess = fileContent || text;
+    const contentToProcess = text;
 
     console.log("📄 Processing content:", {
-      source: fileContent ? `File: ${fileName}` : "Text input",
-      length: contentToProcess.length,
+      source: fileName ? `File: ${fileName}` : "Text input",
+      contentLength: contentToProcess.length,
+      fileType: fileType || 'text'
     });
 
-const prompt = `You are a Master Educational Architect. Your task is to deconstruct the provided content and rebuild it into a gamified study suite.
+const prompt = `You are a Master Educational Architect. Deconstruct the provided content and rebuild it into a gamified study suite.
 
-### GOAL
-Produce 15-20 high-quality, engaging study units. 
+GOAL: Produce 15-20 high-quality, engaging study units.
 
-### CONTENT TO PROCESS
+CONTENT TO PROCESS (truncated):
 ${contentToProcess.substring(0, 3000)}
 
-### FORMAT TYPES
-1. MULTIPLE_CHOICE: { "id": string, "type": "multiple_choice", "question": string, "options": [4 strings], "correctIndex": number, "explanation": string }
-2. FLASHCARD: { "id": string, "type": "flashcard", "content": "Question?Answer" }
-3. CONCEPT: { "id": string, "type": "concept", "content": string, "explanation": string }
-4. VISUAL_EXAMPLE: { "id": string, "type": "visual_example", "title": string, "content": string }
-5. MATCH_GAME: { "id": string, "type": "match_game", "title": string, "pairs": [{"term": string, "definition": string}] }
+OUTPUT FORMAT: Return ONLY a valid JSON array (no surrounding text, no code fences). Each item MUST be one of the following types with the exact schema:
 
-### STRICT RULES
-- **Tone**: Use high-energy, witty, and relatable humor. Use vivid real-world analogies (e.g., comparing a cell membrane to a club bouncer).
-- **Variety**: You MUST use all 5 types. No single type should exceed 30% of the total output.
-- **Accuracy**: Multiple choice distractors must be plausible, not obvious jokes.
-- **Match Games**: Each match game must contain exactly 5 pairs.
-- **JSON Integrity**: Use ONLY double quotes for keys and strings. If you use quotes inside a string, escape them with a backslash (\"). Do not include any text outside the JSON array.
+1. MULTIPLE_CHOICE:
+{ "id": string, "type": "multiple_choice", "question": string, "options": [4 strings], "correctIndex": number, "explanation": string }
 
-### OUTPUT
-Return ONLY a valid JSON array.`;
+2. FLASHCARD:
+{ "id": string, "type": "flashcard", "content": "Question?Answer" }
+
+3. CONCEPT:
+{ "id": string, "type": "concept", "content": string, "explanation": string }
+
+4. VISUAL_EXAMPLE:
+{ "id": string, "type": "visual_example", "title": string, "content": string }
+
+5. MATCH_GAME:
+{ "id": string, "type": "match_game", "title": string, "pairs": [{"term": string, "definition": string}] }
+
+STRICT RULES:
+- Tone: High-energy, witty, relatable; use vivid analogies.
+- Variety: Use all 5 types; no type exceeds 30% of items.
+- Accuracy: Multiple-choice distractors must be plausible.
+- Match games: Exactly 5 pairs per item.
+- JSON integrity: Use ONLY double quotes; escape inner quotes with \\". Do NOT include any text outside the JSON array.
+
+READABILITY REQUIREMENTS (critical):
+- For "content" and "explanation" fields, write structured Markdown with clear sections.
+- Always include headings (e.g., "## Key Idea"), bullets ("- " or "* "), and paragraph breaks (blank lines) where appropriate.
+- Do NOT collapse everything into one large paragraph; ensure newlines between sections and bullets.
+- Keep flashcard content strictly as "Question?Answer" without Markdown.
+`;
 
     console.log("🤖 Generating interactive content...");
 
@@ -84,6 +98,23 @@ Return ONLY a valid JSON array.`;
       const parsed = JSON.parse(jsonText);
       materials = Array.isArray(parsed) ? parsed : [parsed];
 
+      // Lightweight server-side safeguard: ensure paragraph breaks & lists are preserved
+      const formatText = (text) => {
+        if (!text || typeof text !== 'string') return '';
+        // Normalize CRLF to LF and trim trailing spaces
+        let t = text.replace(/\r\n/g, "\n").replace(/\t/g, ' ').replace(/[ \u00A0]+$/gm, '');
+        // If there are no newlines but the text is long, insert paragraph breaks after sentences
+        if (!/\n/.test(t) && t.length > 240) {
+          t = t
+            .split(/(?<=[.!?])\s+/)
+            .filter(Boolean)
+            .join("\n\n");
+        }
+        // Collapse 3+ newlines into double newlines to keep sections clear
+        t = t.replace(/\n{3,}/g, "\n\n");
+        return t;
+      };
+
       materials = materials.map((material, index) => {
         const baseId = `material_${Date.now()}_${index}`;
         
@@ -98,7 +129,7 @@ Return ONLY a valid JSON array.`;
             correctIndex: typeof material.correctIndex === 'number' 
               ? material.correctIndex 
               : 0,
-            explanation: material.explanation || 'Review the concept',
+            explanation: formatText(material.explanation || 'Review the concept'),
             id: material.id || baseId
           };
         }
@@ -107,7 +138,7 @@ Return ONLY a valid JSON array.`;
           return {
             type: 'visual_example',
             title: material.title || 'Example',
-            content: material.content || 'Consider this example...',
+            content: formatText(material.content || 'Consider this example...'),
             id: material.id || baseId
           };
         }
@@ -143,8 +174,8 @@ Return ONLY a valid JSON array.`;
         // Default to concept
         return {
           type: 'concept',
-          content: material.content || 'Key concept to remember',
-          explanation: material.explanation || '',
+          content: formatText(material.content || 'Key concept to remember'),
+          explanation: formatText(material.explanation || ''),
           id: material.id || baseId
         };
       });
