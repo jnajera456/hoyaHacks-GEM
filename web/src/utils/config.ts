@@ -3,15 +3,8 @@ export const CONFIG = {
   ALLOWED_FILE_TYPES: [
     'application/pdf',
     'text/plain',
-    'video/mp4',
-    'video/mpeg',
-    'video/quicktime',
-    'audio/mpeg',
-    'audio/wav',
-    'application/msword',
-    'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
   ],
-  ALLOWED_EXTENSIONS: ['.pdf', '.txt', '.mp4', '.mov', '.mp3', '.wav', '.doc', '.docx'],
+  ALLOWED_EXTENSIONS: ['.pdf', '.txt'],
   
   // AI Configuration
   MAX_TEXT_LENGTH: 3000, // Characters sent to AI

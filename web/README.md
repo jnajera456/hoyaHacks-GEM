@@ -1,8 +1,70 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# GEM Web App
 
-## Getting Started
+## Quick Setup
 
-First, run the development server:
+```bash
+npm install
+cp .env.example .env.local
+```
+
+Add your API keys to `.env.local`. You'll need:
+- MongoDB connection string
+- ElevenLabs API key
+
+Then start the dev server:
+
+```bash
+npm run dev
+```
+
+Visit `http://localhost:3000`
+
+## What We Support
+
+**File uploads:** PDF and TXT files only
+
+## How the App Works
+
+1. **User signs up** - Creates account with email/password
+2. **Uploads a file** - TXT or PDF with study terms
+3. **AI processes it** - Gemini AI generates flashcards and quizzes
+4. **User studies** - Flashcards, matching games, audio pronunciation
+5. **Tracks progress** - Saves decks to account
+
+## API Endpoints
+
+- `/api/auth/` - Login/signup
+- `/api/decks/` - Create and manage study decks
+- `/api/generate/` - AI content generation
+- `/api/generate-audio/` - Text-to-speech
+
+## Environment Variables
+
+See `.env.example` for all required keys.
+
+## Running in Production
+
+```bash
+npm run build
+npm start
+```
+
+## Troubleshooting
+
+**Can't connect to MongoDB?**
+- Check your connection string in `.env.local`
+- Make sure your IP is whitelisted in MongoDB Atlas
+
+**Build errors?**
+```bash
+rm -rf .next node_modules
+npm install
+npm run build
+```
+
+## Questions?
+
+Check the root [README.md](../README.md) for project overview.
 
 ```bash
 npm run dev

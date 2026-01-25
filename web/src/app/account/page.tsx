@@ -72,7 +72,6 @@ export default function AccountPage() {
   useEffect(() => {
     const load = async () => {
       try {
-        // who am I
         const meRes = await fetch('/api/auth/me', { credentials: 'include' });
         if (meRes.ok) {
           const me = await meRes.json();
@@ -82,7 +81,6 @@ export default function AccountPage() {
             name: me.user.name || '',
           }));
         }
-        // decks
         const decksRes = await fetch('/api/decks', { credentials: 'include' });
         if (decksRes.ok) {
           const data = await decksRes.json();
@@ -213,7 +211,6 @@ export default function AccountPage() {
       const data = await response.json();
       if (response.ok && data.success) {
         alert(`Added ${data.newMaterials.length} materials!`);
-        // Update the deck in state
         setUserDecks(prev => prev.map(record => 
           record.id === augmentDeckId 
             ? { ...record, deck: data.deck }

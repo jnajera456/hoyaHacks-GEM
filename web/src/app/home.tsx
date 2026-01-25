@@ -123,7 +123,7 @@ export default function Home() {
                 Upload or paste, then generate study decks fast.
               </h1>
               <p className="text-white/90 text-lg max-w-3xl">
-                Turn PDFs, videos, or text into flashcards, quizzes, and visuals in seconds—then save and study.
+                Turn PDFs or text into flashcards, quizzes, and more in seconds—then save and study.
               </p>
             </div>
           </div>
@@ -133,19 +133,19 @@ export default function Home() {
             <div className="rounded-2xl bg-white shadow-sm border border-orange-100/60 p-6 space-y-6">
               <div>
                 <h2 className="text-xl font-bold text-[#303545]">Upload file</h2>
-                <p className="text-sm text-[#646975]">PDF, TXT, MP4, MP3 (max 10MB). We'll parse and clean it.</p>
+                <p className="text-sm text-[#646975]">PDF or TXT files (max 10MB). We'll parse and extract your content.</p>
               </div>
 
               <Upload
                 beforeUpload={handleFileUpload}
                 maxCount={1}
-                accept=".pdf,.txt,.mp4,.mov,.mp3,.wav"
+                accept=".pdf,.txt"
                 showUploadList={false}
               >
                 <div className="border-2 border-dashed border-orange-200 rounded-xl p-6 text-center cursor-pointer bg-orange-50/50 hover:bg-orange-50 transition">
                   <UploadOutlined style={{ fontSize: 32, color: '#fa541c', marginBottom: 8 }} />
                   <div className="text-[#303545] font-semibold">Click to upload file</div>
-                  <p className="text-sm text-[#646975] mt-1">We support PDF, TXT, MP4, MP3 up to 10MB</p>
+                  <p className="text-sm text-[#646975] mt-1">We support PDF and TXT files up to 10MB</p>
                 </div>
               </Upload>
 
