@@ -1,15 +1,13 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { NextResponse } from "next/server";
 
-// Initialize Gemini
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({ model: "gemini-3-flash-preview" });
+const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
 export async function POST(request) {
   try {
     const { text, fileContent, fileName, fileType } = await request.json();
 
-    // Validate input
     if (!text && !fileContent) {
       return NextResponse.json(
         {
@@ -22,111 +20,182 @@ export async function POST(request) {
 
     const contentToProcess = fileContent || text;
 
-    console.log("📝 Processing content:", {
+    console.log("📄 Processing content:", {
       source: fileContent ? `File: ${fileName}` : "Text input",
       length: contentToProcess.length,
-      preview: contentToProcess.substring(0, 200) + "...",
     });
 
-    // Check if this is a PDF placeholder message
-    const isPDFPlaceholder =
-      contentToProcess.includes("PDF text extraction") ||
-      contentToProcess.includes("Save as TXT file");
+const prompt = `You are a Master Educational Architect. Your task is to deconstruct the provided content and rebuild it into a gamified study suite.
 
-    // SIMPLE PROMPT that works better
-    const prompt = `Create study materials from this content. 
-Return ONLY a valid JSON array with 3-5 items. Each item should have: type, content, and explanation.
+### GOAL
+Produce 15-20 high-quality, engaging study units. 
 
-Example format:
-[
-  {"type": "flashcard", "content": "Question? Answer", "explanation": "More details"},
-  {"type": "summary", "content": "Brief summary here", "explanation": ""},
-  {"type": "concept", "content": "Key concept", "explanation": "Why it matters"}
-]
+### CONTENT TO PROCESS
+${contentToProcess.substring(0, 3000)}
 
-Content: ${contentToProcess.substring(0, 1500)}`;
+### FORMAT TYPES
+1. MULTIPLE_CHOICE: { "id": string, "type": "multiple_choice", "question": string, "options": [4 strings], "correctIndex": number, "explanation": string }
+2. FLASHCARD: { "id": string, "type": "flashcard", "content": "Question?Answer" }
+3. CONCEPT: { "id": string, "type": "concept", "content": string, "explanation": string }
+4. VISUAL_EXAMPLE: { "id": string, "type": "visual_example", "title": string, "content": string }
+5. MATCH_GAME: { "id": string, "type": "match_game", "title": string, "pairs": [{"term": string, "definition": string}] }
 
-    console.log("🤖 Sending request to Gemini...");
+### STRICT RULES
+- **Tone**: Use high-energy, witty, and relatable humor. Use vivid real-world analogies (e.g., comparing a cell membrane to a club bouncer).
+- **Variety**: You MUST use all 5 types. No single type should exceed 30% of the total output.
+- **Accuracy**: Multiple choice distractors must be plausible, not obvious jokes.
+- **Match Games**: Each match game must contain exactly 5 pairs.
+- **JSON Integrity**: Use ONLY double quotes for keys and strings. If you use quotes inside a string, escape them with a backslash (\"). Do not include any text outside the JSON array.
+
+### OUTPUT
+Return ONLY a valid JSON array.`;
+
+    console.log("🤖 Generating interactive content...");
 
     const result = await model.generateContent(prompt);
     const response = await result.response;
     const geminiText = response.text();
 
-    console.log("✅ Raw response preview:", geminiText.substring(0, 200));
+    console.log("✅ Received response");
 
-    // Try to extract JSON
     let materials = [];
     try {
-      // Clean the response
       let jsonText = geminiText.trim();
-
-      // Remove markdown code blocks
+      
       jsonText = jsonText
         .replace(/```json\s*/g, "")
+        .replace(/```javascript\s*/g, "")
         .replace(/```\s*/g, "")
-        .replace(/```javascript\s*/g, "");
+        .trim();
 
-      // Try to parse
       const parsed = JSON.parse(jsonText);
       materials = Array.isArray(parsed) ? parsed : [parsed];
 
-      console.log("✅ Parsed", materials.length, "materials");
-    } catch (parseError) {
-      console.error("❌ JSON parse error:", parseError.message);
+      materials = materials.map((material, index) => {
+        const baseId = `material_${Date.now()}_${index}`;
+        
+        // Validate each type
+        if (material.type === 'multiple_choice') {
+          return {
+            type: 'multiple_choice',
+            question: material.question || 'What is the main concept?',
+            options: Array.isArray(material.options) && material.options.length === 4 
+              ? material.options 
+              : ['Option A', 'Option B', 'Option C', 'Option D'],
+            correctIndex: typeof material.correctIndex === 'number' 
+              ? material.correctIndex 
+              : 0,
+            explanation: material.explanation || 'Review the concept',
+            id: material.id || baseId
+          };
+        }
+        
+        if (material.type === 'visual_example') {
+          return {
+            type: 'visual_example',
+            title: material.title || 'Example',
+            content: material.content || 'Consider this example...',
+            id: material.id || baseId
+          };
+        }
+        
+        if (material.type === 'match_game') {
+          return {
+            type: 'match_game',
+            title: material.title || 'Match the pairs!',
+            pairs: Array.isArray(material.pairs) && material.pairs.length >= 4
+              ? material.pairs.slice(0, 6)
+              : [
+                  {term: 'Term 1', definition: 'Definition 1'},
+                  {term: 'Term 2', definition: 'Definition 2'},
+                  {term: 'Term 3', definition: 'Definition 3'},
+                  {term: 'Term 4', definition: 'Definition 4'}
+                ],
+            id: material.id || baseId
+          };
+        }
+        
+        if (material.type === 'flashcard') {
+          let content = material.content || 'Question?Answer';
+          if (!content.includes('?')) {
+            content = `What should you know?${content}`;
+          }
+          return {
+            type: 'flashcard',
+            content: content,
+            id: material.id || baseId
+          };
+        }
+        
+        // Default to concept
+        return {
+          type: 'concept',
+          content: material.content || 'Key concept to remember',
+          explanation: material.explanation || '',
+          id: material.id || baseId
+        };
+      });
 
-      // FALLBACK: Create materials manually
-      materials = [
-        {
-          type: "summary",
-          content: "Study materials from your upload",
-          explanation: "Generated study content",
-        },
-        {
-          type: "flashcard",
-          content: "What was the main topic? Review key points",
-          explanation: "Focus on understanding core concepts",
-        },
-      ];
+      console.log("Parsed", materials.length, "materials");
+
+    } catch (parseError) {
+      console.error("Parse error:", parseError.message);
+
     }
 
-    // Ensure all materials have required fields
-    const materialsWithIds = materials.map((material, index) => ({
-      type: material.type || (index === 0 ? "summary" : "flashcard"),
-      content: material.content || `Study point ${index + 1}`,
-      explanation: material.explanation || "",
-      id: `material_${Date.now()}_${index}`,
-    }));
+    if (materials.length < 4) {
+      materials.push({
+        type: 'concept',
+        content: 'Review this material regularly for better retention',
+        explanation: 'Spaced repetition is scientifically proven to improve memory!',
+        id: `material_${Date.now()}_extra`
+      });
+    }
 
-    // Create deck
     const deck = {
       id: `deck_${Date.now()}`,
       title: fileName
-        ? `Study: ${fileName.replace(".pdf", "").replace(".txt", "")}`
-        : `Study Deck`,
-      materials: materialsWithIds,
-      sourceText: contentToProcess.substring(0, 300),
-      sourceFile: fileName ? { name: fileName, type: fileType } : undefined,
+        ? `${fileName.replace(/\.(pdf|txt|mp4|mp3|wav|mov)$/i, '')}`
+        : `Study Deck - ${new Date().toLocaleDateString()}`,
+      materials: materials,
+      sourceText: contentToProcess.substring(0, 500),
+      sourceFile: fileName ? { 
+        name: fileName, 
+        type: fileType,
+        size: contentToProcess.length 
+      } : undefined,
       generatedAt: new Date().toISOString(),
       stats: {
-        totalMaterials: materialsWithIds.length,
-      },
+        totalMaterials: materials.length,
+        multipleChoice: materials.filter(m => m.type === 'multiple_choice').length,
+        flashcards: materials.filter(m => m.type === 'flashcard').length,
+        concepts: materials.filter(m => m.type === 'concept').length,
+        visualExamples: materials.filter(m => m.type === 'visual_example').length,
+        games: materials.filter(m => m.type === 'match_game').length
+      }
     };
 
-    console.log(`🎉 Created deck with ${materialsWithIds.length} materials`);
+    console.log(`Created deck: "${deck.title}"`);
+    console.log(`${deck.stats.multipleChoice} quizzes`);
+    console.log(`${deck.stats.flashcards} flashcards`);
+    console.log(`${deck.stats.concepts} concepts`);
+    console.log(`${deck.stats.visualExamples} examples`);
+    console.log(`${deck.stats.games} games`);
 
     return NextResponse.json({
       success: true,
-      materials: materialsWithIds,
+      materials: materials,
       deck: deck,
-      message: "Study materials generated successfully!",
+      message: `Generated ${materials.length} interactive study materials!`,
     });
+
   } catch (error) {
-    console.error("❌ API Route Error:", error);
+    console.error("Error:", error);
 
     return NextResponse.json(
       {
         success: false,
-        error: error.message,
+        error: error.message || 'Failed to generate study materials',
       },
       { status: 500 }
     );

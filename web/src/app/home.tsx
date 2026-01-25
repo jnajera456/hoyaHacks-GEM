@@ -1,5 +1,5 @@
 "use client";
-
+import { saveDeck, getUser, saveUser } from '@/utils/deckStorage';
 import { Layout, Typography, Space, Card, Button, Upload, Divider, Input, message, Alert, Progress, Tag } from "antd";
 import { UploadOutlined, FilePdfOutlined, VideoCameraOutlined, FileTextOutlined, CloseOutlined, CheckCircleOutlined, SaveOutlined } from "@ant-design/icons";
 import { useState, useRef } from 'react';
@@ -151,24 +151,29 @@ export default function Home() {
 
   // Save deck function
   const saveDeckToAccount = (deck: any) => {
-    try {
-      const existingDecks = JSON.parse(localStorage.getItem('studyDecks') || '[]');
-      const existingIndex = existingDecks.findIndex((d: any) => d.id === deck.id);
-      
-      if (existingIndex >= 0) {
-        existingDecks[existingIndex] = deck;
-      } else {
-        existingDecks.push(deck);
-      }
-      
-      localStorage.setItem('studyDecks', JSON.stringify(existingDecks));
-      
-      // Stats update removed for simplicity
-      
-    } catch (error) {
-      console.error('Error saving deck:', error);
+  try {
+    // Save deck using your utility
+    saveDeck(deck);
+    
+    // Update user stats
+    const user = getUser();
+    if (user) {
+      const decks = getAllDecks(); // Import this too
+      const updatedUser = {
+        ...user,
+        studyStats: {
+          ...user.studyStats,
+          totalDecks: decks.length,
+          totalFlashcards: decks.reduce((total, d) => total + d.materials.length, 0)
+        }
+      };
+      saveUser(updatedUser);
     }
-  };
+  } catch (error) {
+    console.error('Error saving deck:', error);
+  }
+};
+
 
   const getFileIcon = (fileType: string) => {
     if (fileType.includes('pdf')) return <FilePdfOutlined style={{ color: '#ff4d4f' }} />;
