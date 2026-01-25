@@ -1,5 +1,5 @@
 /* Separate the global selectors to avoid the comma error */
-:global(html) {
+/* :global(html) {
   margin: 0;
   padding: 0;
   height: 100%;
@@ -9,8 +9,8 @@
   margin: 0;
   padding: 0;
   height: 100%;
-  overflow: hidden; /* This prevents the black bar at the bottom */
-}
+  overflow: hidden; /* This prevents the black bar at the bottom
+} */
 
 .loginLayout {
   height: 100vh;
