@@ -1,6 +1,8 @@
 'use client';
-import { Button, Checkbox, Form, Input, Layout, Typography } from 'antd';
+import { Button, Checkbox, Form, Input, Layout, Typography, message } from 'antd';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useState } from 'react';
 import styles from './login.module.css';
 
 const { Content } = Layout;
@@ -13,22 +15,33 @@ interface LoginValues {
 }
 
 const LoginPage = () => {
+  const [loading, setLoading] = useState(false);
+  const router = useRouter();
+
   const onFinish = async (values: LoginValues) => {
     try {
-      const response = await fetch('/api/login', {
+      setLoading(true);
+      const response = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include', // ensure cookie is set
         body: JSON.stringify(values),
       });
   
       const data = await response.json();
       if (response.ok) {
-        alert("Success: " + data.message);
+        if (process.env.NODE_ENV !== 'production') {
+          console.log('login success (no token logged)');
+        }
+        message.success('Login successful!');
+        router.push('/');
       } else {
-        alert("Error: " + data.message);
+        message.error(data.error || 'Login failed');
       }
     } catch (error) {
-      console.error("Failed to connect to the server", error);
+      message.error('Connection error. Please try again.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -107,6 +120,7 @@ const LoginPage = () => {
                 <Button
                   type="primary"
                   htmlType="submit"
+                  loading={loading}
                   className={styles.loginFormButton}
                 >
                   Sign in now
