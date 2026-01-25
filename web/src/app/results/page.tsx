@@ -46,10 +46,13 @@ export default function ResultsPage() {
   const [augmentFile, setAugmentFile] = useState<File | null>(null);
   const [augmentLoading, setAugmentLoading] = useState(false);
   
+  const [audioLoading, setAudioLoading] = useState(false);
+  const [audioPlaying, setAudioPlaying] = useState(false);
+  
   const containerRef = useRef<HTMLDivElement>(null);
   const touchStartY = useRef(0);
   const touchEndY = useRef(0);
-  const audioFeedback = useRef<AudioFeedback | null>(null);
+  const currentAudioRef = useRef<HTMLAudioElement | null>(null);
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -119,6 +122,75 @@ export default function ResultsPage() {
       alert('Error augmenting deck');
     } finally {
       setAugmentLoading(false);
+    }
+  };
+
+  const playAudio = async () => {
+    if (!deck) return;
+    
+    // Stop current audio if playing
+    if (currentAudioRef.current) {
+      currentAudioRef.current.pause();
+      currentAudioRef.current = null;
+      setAudioPlaying(false);
+    }
+
+    setAudioLoading(true);
+    
+    try {
+      const currentMaterial = deck.materials[currentIndex];
+      
+      // Get text content to speak
+      let textToSpeak = '';
+      if (currentMaterial.type === 'flashcard' && currentMaterial.content) {
+        textToSpeak = currentMaterial.content;
+      } else if (currentMaterial.type === 'multiple_choice') {
+        textToSpeak = currentMaterial.question || '';
+        if (currentMaterial.explanation) {
+          textToSpeak += '. ' + currentMaterial.explanation;
+        }
+      } else {
+        textToSpeak = currentMaterial.content || '';
+      }
+      
+      // Call audio generation API
+      const response = await fetch('/api/generate-audio', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: textToSpeak })
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Audio API error:', response.status, errorText);
+        throw new Error(`Audio generation failed: ${response.status} ${errorText}`);
+      }
+
+      const audioBlob = await response.blob();
+      const audioUrl = URL.createObjectURL(audioBlob);
+      
+      const audio = new Audio(audioUrl);
+      currentAudioRef.current = audio;
+      
+      audio.onplay = () => setAudioPlaying(true);
+      audio.onended = () => {
+        setAudioPlaying(false);
+        URL.revokeObjectURL(audioUrl);
+        currentAudioRef.current = null;
+      };
+      audio.onerror = () => {
+        setAudioPlaying(false);
+        URL.revokeObjectURL(audioUrl);
+        currentAudioRef.current = null;
+      };
+
+      await audio.play();
+      
+    } catch (error) {
+      console.error('Audio generation error:', error);
+      alert('Failed to generate audio');
+    } finally {
+      setAudioLoading(false);
     }
   };
 
@@ -203,6 +275,14 @@ export default function ResultsPage() {
 
   const handlePrev = () => {
     if (!deck || isTransitioning) return;
+    
+    // Stop audio when changing cards
+    if (currentAudioRef.current) {
+      currentAudioRef.current.pause();
+      currentAudioRef.current = null;
+      setAudioPlaying(false);
+    }
+    
     setDirection('down');
     setIsTransitioning(true);
     resetState();
@@ -214,6 +294,14 @@ export default function ResultsPage() {
 
   const handleNext = () => {
     if (!deck || isTransitioning) return;
+    
+    // Stop audio when changing cards
+    if (currentAudioRef.current) {
+      currentAudioRef.current.pause();
+      currentAudioRef.current = null;
+      setAudioPlaying(false);
+    }
+    
     setDirection('up');
     setIsTransitioning(true);
     resetState();
@@ -298,6 +386,16 @@ export default function ResultsPage() {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [deck, isTransitioning]);
+
+  // Cleanup audio on unmount or when changing cards
+  useEffect(() => {
+    return () => {
+      if (currentAudioRef.current) {
+        currentAudioRef.current.pause();
+        currentAudioRef.current = null;
+      }
+    };
+  }, [currentIndex]);
 
   // If no deck is available, show loading state (will redirect)
   if (!deck) {
@@ -398,6 +496,32 @@ export default function ResultsPage() {
 
       {/* Navigation buttons fixed to far right of page */}
       <div className="fixed right-8 top-1/2 -translate-y-1/2 z-50 flex flex-col gap-6">
+        {/* Audio button */}
+        <button
+          onClick={playAudio}
+          disabled={audioLoading || audioPlaying}
+          className={`w-14 h-14 flex items-center justify-center border-2 rounded-full transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed ${
+            audioPlaying 
+              ? 'bg-green-500 border-green-400' 
+              : 'bg-white border-gray-300 hover:bg-gray-100 hover:scale-105'
+          }`}
+        >
+          {audioLoading ? (
+            <svg className="w-6 h-6 text-gray-700 animate-spin" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+          ) : audioPlaying ? (
+            <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z"/>
+            </svg>
+          ) : (
+            <svg className="w-6 h-6 text-gray-700" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
+            </svg>
+          )}
+        </button>
+        
         <button
           onClick={handlePrev}
           disabled={isTransitioning || !deck}
