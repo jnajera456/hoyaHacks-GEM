@@ -1,8 +1,8 @@
 "use client";
 
-import { Layout, Typography, Space, Card, Button, Upload, Divider, Input, message, Alert, Progress, Tag } from "antd";
-import { UploadOutlined, FilePdfOutlined, VideoCameraOutlined, FileTextOutlined, CloseOutlined, CheckCircleOutlined, SaveOutlined } from "@ant-design/icons";
-import { useState, useRef } from 'react';
+import { Layout, Typography, Space, Card, Button, Upload, Divider, Input, message, Alert, Progress, Tag, Modal, Form } from "antd";
+import { UploadOutlined, FilePdfOutlined, VideoCameraOutlined, FileTextOutlined, CloseOutlined, CheckCircleOutlined, SaveOutlined, EditOutlined } from "@ant-design/icons";
+import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { FileParser, FileParseResult } from '@/utils/fileParser';
 
@@ -22,7 +22,18 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [generatedDeck, setGeneratedDeck] = useState<any>(null);
+  const [titleModalVisible, setTitleModalVisible] = useState(false);
+  const [customTitle, setCustomTitle] = useState('');
+  const [generatingDeckData, setGeneratingDeckData] = useState<any>(null);
   const router = useRouter();
+  const [form] = Form.useForm();
+
+  useEffect(() => {
+    if (titleModalVisible && generatingDeckData) {
+      setCustomTitle(generatingDeckData.defaultTitle);
+      form.setFieldsValue({ title: generatingDeckData.defaultTitle });
+    }
+  }, [titleModalVisible, generatingDeckData]);
 
   const handleFileUpload = async (file: File) => {
     // Check file size (max 10MB)
@@ -97,6 +108,42 @@ export default function Home() {
       return;
     }
 
+    // Generate a default title based on source
+    let defaultTitle = '';
+    if (readyFile) {
+      defaultTitle = `Study: ${fileName.replace(/\.[^/.]+$/, '')}`; // Remove extension
+    } else {
+      defaultTitle = `Study: ${text.substring(0, 30).trim()}${text.length > 30 ? '...' : ''}`;
+    }
+
+    // Set default custom title
+    setCustomTitle(defaultTitle);
+
+    // Store data for later use
+    const generatingData = {
+      contentToSend,
+      fileName,
+      fileType,
+      readyFile: readyFile ? {
+        name: readyFile.file.name,
+        type: readyFile.file.type
+      } : undefined,
+      defaultTitle
+    };
+
+    setGeneratingDeckData(generatingData);
+    
+    // Show title modal before generating
+    setTitleModalVisible(true);
+  };
+
+  const handleConfirmGenerate = async () => {
+    if (!generatingDeckData) return;
+    
+    const { contentToSend, fileName, fileType, readyFile, defaultTitle } = generatingDeckData;
+    const finalTitle = customTitle.trim() || defaultTitle;
+
+    setTitleModalVisible(false);
     setLoading(true);
     setGeneratedDeck(null);
     
@@ -108,7 +155,8 @@ export default function Home() {
           text: contentToSend,
           fileContent: readyFile ? contentToSend : undefined,
           fileName,
-          fileType
+          fileType,
+          customTitle: finalTitle
         })
       });
 
@@ -118,17 +166,18 @@ export default function Home() {
         const sourceType = readyFile ? `file "${fileName}"` : 'text';
         message.success(`✅ Generated ${data.materials?.length || 0} study materials from ${sourceType}!`);
         
-        // Create deck from response
-        const deck = data.deck || {
-          id: `deck_${Date.now()}`,
-          title: readyFile 
-            ? `Study: ${fileName}`
-            : `Study: ${text.substring(0, 30)}${text.length > 30 ? '...' : ''}`,
-          materials: data.materials,
+        // ✅ FIXED: Use coverImage first, then imageUrl as fallback
+        const deck = {
+          id: data.deck?.id || `deck_${Date.now()}`,
+          title: finalTitle,
+          materials: data.materials || data.deck?.materials || [],
+          coverImage: data.deck?.coverImage || data.deck?.imageUrl, // ✅ Check both
           sourceText: contentToSend.substring(0, 500) + (contentToSend.length > 500 ? '...' : ''),
           sourceFile: readyFile ? { name: fileName, type: fileType } : undefined,
           generatedAt: new Date().toISOString()
         };
+        
+        console.log('✅ Deck created with image:', deck.coverImage);
         
         setGeneratedDeck(deck);
         
@@ -146,6 +195,7 @@ export default function Home() {
       console.error('Request failed:', error);
     } finally {
       setLoading(false);
+      setGeneratingDeckData(null);
     }
   };
 
@@ -162,8 +212,7 @@ export default function Home() {
       }
       
       localStorage.setItem('studyDecks', JSON.stringify(existingDecks));
-      
-      // Stats update removed for simplicity
+      console.log('✅ Deck saved with image:', deck.coverImage);
       
     } catch (error) {
       console.error('Error saving deck:', error);
@@ -179,12 +228,6 @@ export default function Home() {
 
   return (
     <Layout style={{ minHeight: "100vh" }}>
-      <Header style={{ display: "flex", alignItems: "center" }}>
-        <Title level={4} style={{ color: "white", margin: 0 }}>
-          StudyToks - AI Study Assistant
-        </Title>
-      </Header>
-
       <Content style={{ padding: 16, maxWidth: 520, width: "100%", margin: "0 auto" }}>
         <Space orientation="vertical" size="large" style={{ width: "100%", marginTop: 8 }}>
           <div>
@@ -320,6 +363,42 @@ export default function Home() {
             </Space>
           </Card>
 
+          {/* Title Modal */}
+          <Modal
+            title="Set Deck Title"
+            open={titleModalVisible}
+            onOk={handleConfirmGenerate}
+            onCancel={() => {
+              setTitleModalVisible(false);
+              setGeneratingDeckData(null);
+            }}
+            okText="Generate"
+            cancelText="Cancel"
+            okButtonProps={{ loading: loading }}
+          >
+            <Form
+              form={form}
+              layout="vertical"
+            >
+              <Form.Item
+                label="Deck Title"
+                name="title"
+                rules={[{ required: true, message: 'Please enter a title for your study deck' }]}
+              >
+                <Input
+                  placeholder="Enter a title for your study deck"
+                  value={customTitle}
+                  onChange={(e) => setCustomTitle(e.target.value)}
+                  size="large"
+                  autoFocus
+                />
+              </Form.Item>
+              <Text type="secondary">
+                Tip: Use a descriptive title like "Biology Chapter 3" or "History Midterm Review"
+              </Text>
+            </Form>
+          </Modal>
+
           {/* Results Display */}
           {generatedDeck && (
             <Card 
@@ -332,7 +411,7 @@ export default function Home() {
               style={{ marginTop: 16 }}
             >
               <Alert
-                message="Generation Complete!"
+                title="Generation Complete!"
                 description="Your study deck has been saved to your account."
                 type="success"
                 showIcon
@@ -340,7 +419,12 @@ export default function Home() {
               />
               
               <div style={{ marginTop: 16 }}>
-                <Text strong>What's next?</Text>
+                <div style={{ marginBottom: 16 }}>
+                  <Text strong>Deck Title: </Text>
+                  <Text>{generatedDeck.title}</Text>
+                </div>
+                
+                <Text strong>What next?</Text>
                 <div style={{ marginTop: 8 }}>
                   <Button 
                     type="primary"
@@ -369,7 +453,8 @@ export default function Home() {
             <Title level={5} style={{ marginTop: 0 }}>How it works</Title>
             <ol style={{ margin: 0, paddingLeft: 18 }}>
               <li><Text strong>Upload a file</Text> (PDF, TXT, video, audio) <strong>OR</strong> <Text strong>paste text</Text></li>
-              <li>Click <Text strong>"Generate Study Materials"</Text></li>
+              <li>Click <Text strong>Generate Study Materials</Text></li>
+              <li><Text strong>Set a title</Text> for your study deck</li>
               <li>Get flashcards, summaries, and concepts</li>
               <li>Study with TikTok-style interface</li>
               <li>All decks saved automatically</li>

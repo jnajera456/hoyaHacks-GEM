@@ -1,0 +1,66 @@
+.header {
+  background: #ffffff !important;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 60px !important; /* Vertical padding prevents squishing */
+  min-height: 80px; 
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  /* Soft shadow for depth */
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08); 
+  border-bottom: none !important;
+}
+
+.logo a {
+  font-weight: 800;
+  font-size: 1.6rem;
+  color: #303545;
+  letter-spacing: -1px;
+  text-decoration: none;
+}
+
+.menu {
+  flex: 1;
+  border-bottom: none !important;
+  justify-content: center;
+  font-weight: 600;
+  background: transparent !important;
+}
+
+.authButtons {
+  display: flex;
+  gap: 28px;
+  align-items: center;
+}
+
+.loginBtn {
+  color: #303545 !important;
+  font-weight: 700 !important;
+  font-size: 1rem;
+  text-decoration: none;
+}
+
+/* FIXED: Premium, airy orange button */
+.signupBtn {
+  background-color: #fa541c !important;
+  color: #ffffff !important;
+  border: none !important;
+  border-radius: 10px !important;
+  /* Use padding instead of height to prevent the text from feeling squished */
+  padding: 14px 32px !important; 
+  font-weight: 700 !important;
+  font-size: 1rem !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1 !important;
+  box-shadow: 0 4px 14px rgba(250, 84, 28, 0.25);
+  transition: all 0.2s ease;
+}
+
+.signupBtn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(250, 84, 28, 0.35);
+}

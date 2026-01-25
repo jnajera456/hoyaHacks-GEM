@@ -1,0 +1,146 @@
+
+:global(html) {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+}
+
+:global(body) {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  overflow: hidden; /* Keeps the page locked to the screen height */
+}
+
+.signupLayout {
+  height: 100vh;
+  width: 100vw;
+  background-color: #fff;
+  overflow: hidden;
+}
+
+.signupContent {
+  display: flex;
+  height: 100%;
+  width: 100%;
+  padding: 0 !important;
+}
+
+.leftPanel {
+  flex: 1;
+  background: url('https://images.unsplash.com/photo-1535982330050-f1c2fb79ff78?q=80&w=1974&auto=format&fit=crop') no-repeat center center;
+  background-size: cover;
+  padding: 60px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+}
+
+.mainTitle {
+  color: white !important;
+  font-size: 3rem !important;
+  font-weight: 800 !important;
+  margin-bottom: 0 !important;
+}
+
+.subTitle {
+  /* Using an RGBA white (85% opacity) makes it look high-end */
+  color: rgba(255, 255, 255, 0.85) !important; 
+  font-size: 2.2rem !important; /* Slightly smaller than main title */
+  font-weight: 600 !important;   /* Slightly lighter weight than main title */
+  margin-top: 10px !important;
+  text-shadow: 0 2px 4px rgba(0,0,0,0.3); /* Subtle shadow helps it pop off the wood background */
+}
+
+.rightPanel {
+  flex: 1;
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  padding: 40px 60px;
+  position: relative;
+}
+
+.topNav {
+  display: flex;
+  gap: 24px;
+  margin-bottom: 60px; /* Controls the space above the form */
+  font-size: 1.1rem;
+  font-weight: 600;
+  width: 100%;
+}
+
+.activeTab {
+  color: #303545;
+  border-bottom: 4px solid #fa541c; 
+  padding-bottom: 4px;
+}
+
+.navLink {
+  color: #646975;
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.navLink:hover {
+  color: #fa541c;
+}
+
+.formContainer {
+  width: 100%;
+  max-width: 440px;
+  margin: 0 auto;
+}
+
+.inputField {
+  height: 48px !important;
+  background-color: #f6f7fb !important;
+  border: none !important;
+  border-radius: 8px !important;
+  font-size: 1rem !important;
+}
+
+.disclaimer {
+  display: block;
+  font-size: 0.8rem;
+  color: #646975;
+  margin: 20px 0;
+  line-height: 1.4;
+}
+
+.signupButton {
+  width: 100%;
+  height: 56px !important;
+  background-color: #fa541c !important;
+  border-radius: 8px !important;
+  font-size: 1.1rem !important;
+  font-weight: 700 !important;
+  margin-top: 10px;
+}
+
+.footerLink {
+  text-align: center;
+  margin-top: 32px;
+  color: #646975;
+  font-size: 1rem;
+  border-top: 1px solid #edeff4;
+  padding-top: 32px;
+}
+
+.footerLink a {
+  color: #4255ff;
+  font-weight: 600;
+}
+
+@media (max-width: 992px) {
+  .leftPanel { display: none; }
+  .rightPanel { flex: 1; }
+}
+
+.signInTitle {
+  color: #303545 !important;
+  font-size: 2rem !important;
+  font-weight: 800 !important; /* Matches the heavy weight on Login */
+  margin-bottom: 32px !important;
+  text-align: left;
+}

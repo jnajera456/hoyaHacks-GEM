@@ -3,11 +3,11 @@ import { NextResponse } from "next/server";
 
 // Initialize Gemini
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
 
 export async function POST(request) {
   try {
-    const { text, fileContent, fileName, fileType } = await request.json();
+    const { text, fileContent, fileName, fileType, customTitle } = await request.json();
     
     // Validate input
     if (!text && !fileContent) {
@@ -25,10 +25,12 @@ export async function POST(request) {
       preview: contentToProcess.substring(0, 200) + "..."
     });
 
-    // Check if this is a PDF placeholder message
-    const isPDFPlaceholder = contentToProcess.includes("PDF text extraction") || 
-                            contentToProcess.includes("Save as TXT file");
-    
+    // Use custom title if provided
+    const finalTitle = customTitle || 
+      (fileName 
+        ? `Study: ${fileName.replace('.pdf', '').replace('.txt', '')}`
+        : `Study Deck`);
+
     // SIMPLE PROMPT that works better
     const prompt = `Create study materials from this content. 
 Return ONLY a valid JSON array with 3-5 items. Each item should have: type, content, and explanation.
@@ -93,13 +95,47 @@ Content: ${contentToProcess.substring(0, 1500)}`;
       id: `material_${Date.now()}_${index}`
     }));
 
-    // Create deck
+    // Generate image for this deck
+    let deckImageUrl = null;
+    try {
+      console.log("🖼️ Generating image for deck...");
+      
+      // Generate an image based on the deck title/content
+      const imagePrompt = finalTitle + " " + 
+        (fileName ? fileName.replace(/\.[^/.]+$/, "") : "study notes") + 
+        " educational illustration";
+      
+      console.log("Image prompt:", imagePrompt);
+      
+      // Call internal image generation API
+      const imageResponse = await fetch('http://localhost:3000/api/generate-image', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          prompt: imagePrompt
+        })
+      });
+      
+      if (imageResponse.ok) {
+        const imageData = await imageResponse.json();
+        deckImageUrl = imageData.imageUrl;
+        console.log("✅ Image generated:", deckImageUrl);
+      } else {
+        console.warn("⚠️ Image generation failed, using fallback");
+        deckImageUrl = "https://images.pexels.com/photos/8932609/pexels-photo-8932609.jpeg";
+      }
+    } catch (imageError) {
+      console.error("❌ Error generating image:", imageError);
+      deckImageUrl = "https://images.pexels.com/photos/8932609/pexels-photo-8932609.jpeg";
+    }
+
+    // Create deck WITH BOTH coverImage AND imageUrl
     const deck = {
       id: `deck_${Date.now()}`,
-      title: fileName 
-        ? `Study: ${fileName.replace('.pdf', '').replace('.txt', '')}`
-        : `Study Deck`,
+      title: finalTitle,
       materials: materialsWithIds,
+      coverImage: deckImageUrl, // ✅ Primary property
+      imageUrl: deckImageUrl,   // ✅ Keep for backward compatibility
       sourceText: contentToProcess.substring(0, 300),
       sourceFile: fileName ? { name: fileName, type: fileType } : undefined,
       generatedAt: new Date().toISOString(),
