@@ -70,6 +70,19 @@ STRICT RULES:
 - Match games: Exactly 5 pairs per item.
 - JSON integrity: Use ONLY double quotes; escape inner quotes with \\". Do NOT include any text outside the JSON array.
 
+CRITICAL CONTENT LENGTH CONSTRAINTS:
+- For CONCEPT type: content must be MAXIMUM 4 sentences total - concise, punchy, focused on the single most important point.
+- For VISUAL_EXAMPLE type: content must be MAXIMUM 4 sentences with optional 1 short heading - think TikTok-style: quick, digestible, impactful.
+- For MULTIPLE_CHOICE type: the 'explanation' field must be MAXIMUM 2 sentences (about 25-30 words). Be extremely concise - explain ONLY why the answer is correct in the briefest way possible.
+- Each concept and visual example must fit on one screen with NO scrolling.
+- Maintain educational value through clarity and focus, not length.
+- Keep other types (flashcard, match_game) standard length.
+
+FLASHCARD QUESTION REQUIREMENTS:
+- For flashcard items, NEVER use generic questions like 'What should you know?' - always write specific, contextual questions that relate directly to the topic being studied.
+- Example: Instead of 'What should you know?Name the stages', use 'What are the two main stages of photosynthesis?'
+- Questions must be clear, specific, and immediately reveal what concept is being tested.
+
 READABILITY REQUIREMENTS (critical):
 - For "content" and "explanation" fields, write structured Markdown with clear sections.
 - Always include headings (e.g., "## Key Idea"), bullets ("- " or "* "), and paragraph breaks (blank lines) where appropriate.
@@ -97,6 +110,16 @@ READABILITY REQUIREMENTS (critical):
 
       const parsed = JSON.parse(jsonText);
       materials = Array.isArray(parsed) ? parsed : [parsed];
+
+      // Helper function to truncate explanations to 2 sentences max
+      const truncateToTwoSentences = (text) => {
+        if (!text || typeof text !== 'string') return '';
+        const sentences = text.split(/[.!?]+/).filter(s => s.trim());
+        if (sentences.length <= 2) {
+          return text.trim();
+        }
+        return sentences.slice(0, 2).map(s => s.trim()).join('. ') + '.';
+      };
 
       // Lightweight server-side safeguard: ensure paragraph breaks & lists are preserved
       const formatText = (text) => {
@@ -129,7 +152,7 @@ READABILITY REQUIREMENTS (critical):
             correctIndex: typeof material.correctIndex === 'number' 
               ? material.correctIndex 
               : 0,
-            explanation: formatText(material.explanation || 'Review the concept'),
+            explanation: truncateToTwoSentences(material.explanation || 'Review the concept'),
             id: material.id || baseId
           };
         }
