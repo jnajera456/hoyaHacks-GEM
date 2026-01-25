@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { 
@@ -83,7 +84,8 @@ type StudySession = {
 };
 
 export default function AccountPage() {
-  const { user: authUser, logout } = useAuth();
+  const { user: authUser, loading: authLoading, error: authError, logout } = useAuth();
+  const router = useRouter();
   const [user, setUser] = useState<UserType | null>(null);
   const [userDecks, setUserDecks] = useState<GeneratedDeck[]>([]);
   const [studySessions, setStudySessions] = useState<StudySession[]>([]);
@@ -101,6 +103,11 @@ export default function AccountPage() {
 
   // Initialize user from auth context
   useEffect(() => {
+    if (!authLoading && !authUser) {
+      router.push('/login');
+      return;
+    }
+
     if (authUser) {
       const userData: UserType = {
         id: authUser.id,
@@ -134,7 +141,7 @@ export default function AccountPage() {
         language: 'en'
       });
     }
-  }, [authUser]);
+  }, [authUser, authLoading, router]);
 
   // Load decks and study sessions from localStorage
   useEffect(() => {
@@ -178,6 +185,14 @@ export default function AccountPage() {
   const handleSignOut = async () => {
     await logout();
   };
+
+  if (authLoading || !user) {
+    return (
+      <ProtectedRoute>
+        <div className="flex items-center justify-center min-h-screen">Loading account...</div>
+      </ProtectedRoute>
+    );
+  }
 
   const handleSavePreferences = () => {
     if (!user) return;

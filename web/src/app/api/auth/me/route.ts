@@ -28,6 +28,10 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('auth/me cookie present, userId:', decoded.userId);
+    }
+
     await connectDB();
 
     const user = await User.findById(decoded.userId);

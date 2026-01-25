@@ -32,6 +32,10 @@ export function useAuth(): UseAuthReturn {
         credentials: 'include', // Include cookies
       });
 
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('useAuth /api/auth/me status', response.status);
+      }
+
       if (response.ok) {
         const data = await response.json();
         setUser(data.user);
@@ -52,14 +56,22 @@ export function useAuth(): UseAuthReturn {
 
   const logout = async () => {
     try {
+      // Immediately clear user state for instant UI feedback
+      setUser(null);
+      setLoading(true);
+      
       await fetch('/api/auth/logout', {
         method: 'POST',
         credentials: 'include',
       });
-      setUser(null);
-      router.push('/login');
+      
+      // Use replace instead of push to prevent back button issues
+      // Use window.location for hard navigation to clear all state
+      window.location.href = '/login';
     } catch (err) {
       console.error('Logout failed:', err);
+      // Still redirect even if API call fails (cookie might already be cleared)
+      window.location.href = '/login';
     }
   };
 

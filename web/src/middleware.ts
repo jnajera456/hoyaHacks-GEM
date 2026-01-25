@@ -1,44 +1,41 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { verifyToken } from '@/lib/auth';
 
-// Protected routes that require authentication
+// Protected routes that require authentication cookie
 const protectedRoutes = ['/account', '/results'];
-const protectedApiRoutes = ['/api/topics', '/api/decks', '/api/sessions', '/api/files'];
 
-// Public routes that should redirect if already authenticated
+// Public routes that should redirect if already has auth cookie
 const authRoutes = ['/login', '/signup'];
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   
-  // Get token from cookie
-  const token = request.cookies.get('auth_token')?.value;
-  const isAuthenticated = token ? verifyToken(token) !== null : false;
+  // Allow auth endpoints and static assets to bypass middleware
+  if (pathname.startsWith('/api/auth') || pathname.startsWith('/_next') || pathname === '/favicon.ico') {
+    return NextResponse.next();
+  }
+  
+  // Check if auth token cookie exists (simple presence check, not verification)
+  // Actual JWT verification happens in API routes and client-side hooks
+  const hasAuthToken = !!request.cookies.get('auth_token')?.value;
+
+  if (process.env.NODE_ENV !== 'production') {
+    console.log('middleware check', { pathname, hasAuthToken });
+  }
 
   // Check if route is protected
   const isProtectedRoute = protectedRoutes.some(route => pathname.startsWith(route));
-  const isProtectedApiRoute = protectedApiRoutes.some(route => pathname.startsWith(route));
   const isAuthRoute = authRoutes.some(route => pathname.startsWith(route));
 
-  // Redirect to login if accessing protected route without auth
-  if ((isProtectedRoute || isProtectedApiRoute) && !isAuthenticated) {
-    if (isProtectedApiRoute) {
-      // Return 401 for API routes
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
-    
-    // Redirect to login with return URL for page routes
+  // Redirect to login if accessing protected route without auth cookie
+  if (isProtectedRoute && !hasAuthToken) {
     const url = new URL('/login', request.url);
     url.searchParams.set('redirect', pathname);
     return NextResponse.redirect(url);
   }
 
-  // Redirect to account if accessing auth pages while authenticated
-  if (isAuthRoute && isAuthenticated) {
+  // Redirect to account if accessing auth pages while having auth cookie
+  if (isAuthRoute && hasAuthToken) {
     return NextResponse.redirect(new URL('/account', request.url));
   }
 

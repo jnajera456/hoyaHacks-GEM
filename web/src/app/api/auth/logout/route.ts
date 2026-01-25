@@ -12,6 +12,9 @@ export async function POST(request: NextRequest) {
       { status: 200 }
     );
 
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('logout success');
+    }
     clearTokenCookie(response);
     return response;
   } catch (error) {
