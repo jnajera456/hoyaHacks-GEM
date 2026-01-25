@@ -419,11 +419,14 @@ export default function Home() {
               />
               
               <div style={{ marginTop: 16 }}>
+<<<<<<< HEAD
                 <div style={{ marginBottom: 16 }}>
                   <Text strong>Deck Title: </Text>
                   <Text>{generatedDeck.title}</Text>
                 </div>
                 
+=======
+>>>>>>> f2fa7f122f4b3001483192cbbecee30edacfafa8
                 <Text strong>What next?</Text>
                 <div style={{ marginTop: 8 }}>
                   <Button 
@@ -454,7 +457,10 @@ export default function Home() {
             <ol style={{ margin: 0, paddingLeft: 18 }}>
               <li><Text strong>Upload a file</Text> (PDF, TXT, video, audio) <strong>OR</strong> <Text strong>paste text</Text></li>
               <li>Click <Text strong>Generate Study Materials</Text></li>
+<<<<<<< HEAD
               <li><Text strong>Set a title</Text> for your study deck</li>
+=======
+>>>>>>> f2fa7f122f4b3001483192cbbecee30edacfafa8
               <li>Get flashcards, summaries, and concepts</li>
               <li>Study with TikTok-style interface</li>
               <li>All decks saved automatically</li>
