@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { textToSpeech } from "../tts/ttsClient.js";
+import { textToSpeech } from "./ttsClient.js";
 
 export async function POST(request) {
   try {
@@ -26,11 +26,11 @@ export async function POST(request) {
     });
 
   } catch (error) {
-    console.error("❌ Audio generation error:", error);
+    console.error("❌ Audio generation error:", error.message);
     return NextResponse.json(
       {
         success: false,
-        error: error.message,
+        error: error.message || 'Unknown error occurred',
       },
       { status: 500 }
     );

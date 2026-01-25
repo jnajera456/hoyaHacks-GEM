@@ -24,8 +24,22 @@ export async function textToSpeech(text) {
   );
 
   if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`ElevenLabs TTS error: ${error}`);
+    let errorMessage = '';
+    try {
+      const errorData = await response.json();
+      // Handle different error response formats from ElevenLabs
+      if (errorData.detail) {
+        errorMessage = typeof errorData.detail === 'string' ? errorData.detail : JSON.stringify(errorData.detail);
+      } else if (errorData.error) {
+        errorMessage = typeof errorData.error === 'string' ? errorData.error : JSON.stringify(errorData.error);
+      } else {
+        errorMessage = JSON.stringify(errorData);
+      }
+    } catch {
+      errorMessage = await response.text();
+    }
+    console.error(`❌ ElevenLabs error (${response.status}):`, errorMessage);
+    throw new Error(`ElevenLabs TTS error: ${response.status} - ${errorMessage}`);
   }
 
   const audioBuffer = Buffer.from(await response.arrayBuffer());
