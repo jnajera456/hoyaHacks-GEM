@@ -1,6 +1,6 @@
 "use client";
 import { Upload, Divider, Input, message, Tag } from "antd";
-import { UploadOutlined, FilePdfOutlined, VideoCameraOutlined, FileTextOutlined, CloseOutlined, CheckCircleOutlined, SaveOutlined } from "@ant-design/icons";
+import { UploadOutlined, FilePdfOutlined, VideoCameraOutlined, FileTextOutlined, CloseOutlined, CheckCircleOutlined } from "@ant-design/icons";
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
@@ -51,7 +51,6 @@ export default function Home() {
     try {
       const parsed = await FileParser.parseFile(file);
       setUploadedFiles([{ file, status: 'ready', parsedContent: parsed }]);
-      setText((prev) => (prev ? prev : parsed.text));
       message.success('File uploaded and parsed');
     } catch (error: any) {
       console.error('Upload error:', error);
@@ -105,19 +104,7 @@ export default function Home() {
     }
   };
 
-  const saveDeckToAccount = async (deck: any) => {
-    if (!deck) {
-      message.info('Generate a deck first.');
-      return;
-    }
-    if (savedDeckId) {
-      message.success('Deck already saved. Opening your decks...');
-      router.push('/account');
-      return;
-    }
-    message.info('Deck is auto-saved after generation.');
-    router.push('/account');
-  };
+
 
   return (
     <ProtectedRoute>
@@ -144,12 +131,9 @@ export default function Home() {
           <div className="grid lg:grid-cols-[1.2fr_0.8fr] gap-6">
             {/* Left: Input Card */}
             <div className="rounded-2xl bg-white shadow-sm border border-orange-100/60 p-6 space-y-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="text-xl font-bold text-[#303545]">Upload file</h2>
-                  <p className="text-sm text-[#646975]">PDF, TXT, MP4, MP3 (max 10MB). We’ll parse and clean it.</p>
-                </div>
-                <span className="rounded-full bg-orange-50 text-[#fa541c] text-sm font-semibold px-3 py-1">Step 1</span>
+              <div>
+                <h2 className="text-xl font-bold text-[#303545]">Upload file</h2>
+                <p className="text-sm text-[#646975]">PDF, TXT, MP4, MP3 (max 10MB). We'll parse and clean it.</p>
               </div>
 
               <Upload
@@ -210,12 +194,9 @@ export default function Home() {
 
               <Divider />
 
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-lg font-bold text-[#303545]">Paste text</h3>
-                  <p className="text-sm text-[#646975]">Minimum 50 characters. We normalize formatting automatically.</p>
-                </div>
-                <span className="rounded-full bg-orange-50 text-[#fa541c] text-sm font-semibold px-3 py-1">Step 2</span>
+              <div>
+                <h3 className="text-lg font-bold text-[#303545]">Paste text</h3>
+                <p className="text-sm text-[#646975]">Minimum 50 characters. We normalize formatting automatically.</p>
               </div>
 
               <TextArea
@@ -227,33 +208,33 @@ export default function Home() {
                 style={{ backgroundColor: '#f6f7fb', borderRadius: 10, border: '1px solid #edf0f5' }}
               />
 
-              <div className="flex flex-wrap gap-3 pt-2">
+              <div className="flex flex-col gap-3 pt-2">
                 <button
-                  onClick={handleGenerate}
+                  onClick={() => {
+                    if (generatedDeck && savedDeckId) {
+                      router.push(`/results?id=${encodeURIComponent(savedDeckId)}`);
+                    } else if (generatedDeck) {
+                      // Fallback if no saved ID - go to account page
+                      router.push('/account');
+                    } else {
+                      handleGenerate();
+                    }
+                  }}
                   disabled={loading}
                   className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#fa541c] px-5 py-3 text-white font-semibold shadow-sm transition hover:bg-[#ff7a45] disabled:opacity-60"
                 >
-                  {loading ? 'Generating...' : 'Generate Deck'}
+                  {loading ? 'Generating...' : generatedDeck ? 'Study Deck →' : 'Generate Deck'}
                 </button>
-                <button
-                  onClick={() => saveDeckToAccount(generatedDeck)}
-                  disabled={!generatedDeck}
-                  className="inline-flex items-center justify-center gap-2 rounded-lg border border-orange-200 px-5 py-3 text-[#303545] font-semibold transition hover:border-orange-300 disabled:opacity-50"
-                >
-                  <SaveOutlined /> Save Deck
-                </button>
-                <div className="text-sm text-[#646975] flex items-center gap-2">
-                  <div className="h-2 w-2 rounded-full bg-[#fa541c]"></div>
-                  Decks auto-save to your session
-                </div>
+                {generatedDeck && (
+                  <p className="text-sm text-green-600 font-medium">Deck saved! Click above to study.</p>
+                )}
               </div>
             </div>
 
             {/* Right: How it works / Tips */}
             <div className="rounded-2xl bg-white shadow-sm border border-orange-100/60 p-6 space-y-5">
-              <div className="flex items-center justify-between">
+              <div>
                 <h3 className="text-lg font-bold text-[#303545]">How it works</h3>
-                <span className="rounded-full bg-orange-50 text-[#fa541c] text-sm font-semibold px-3 py-1">Step 3</span>
               </div>
               <div className="space-y-4">
                 {[
@@ -292,32 +273,6 @@ export default function Home() {
                   <li>Use the Results page to review, augment, and export decks.</li>
                 </ul>
               </div>
-
-              {generatedDeck && (
-                <div className="rounded-xl border border-orange-100 bg-orange-50/60 p-4 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-xs uppercase tracking-wide text-[#fa541c] font-semibold">Deck ready</p>
-                      <p className="font-semibold text-[#303545]">{generatedDeck.title}</p>
-                    </div>
-                    <button
-                      onClick={() => router.push('/results')}
-                      className="rounded-lg bg-[#fa541c] px-4 py-2 text-white text-sm font-semibold hover:bg-[#ff7a45]"
-                    >
-                      Open Results
-                    </button>
-                  </div>
-                  <p className="text-sm text-[#646975]">{generatedDeck.materials?.length || 0} materials generated. Saved to session.</p>
-                  <div className="flex flex-wrap gap-2">
-                    {generatedDeck.materials?.slice(0, 6).map((m: any, idx: number) => (
-                      <Tag key={idx} color="orange">{m.type}</Tag>
-                    ))}
-                    {generatedDeck.materials?.length > 6 && (
-                      <Tag>+{generatedDeck.materials.length - 6} more</Tag>
-                    )}
-                  </div>
-                </div>
-              )}
 
             </div>
           </div>
