@@ -85,6 +85,7 @@ export async function PUT(
     doc.title = title.trim();
     if (doc.deck) {
       doc.deck.title = title.trim();
+      doc.markModified('deck'); // Mark the Mixed type field as modified
     }
     await doc.save();
 
