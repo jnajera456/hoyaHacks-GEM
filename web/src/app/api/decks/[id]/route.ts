@@ -1,55 +1,34 @@
-import { connectDB } from '@/lib/mongodb';
-import { Deck } from '@/lib/models/Deck';
 import { NextRequest, NextResponse } from 'next/server';
-import jwt from 'jsonwebtoken';
+import { connectDB } from '@/lib/mongodb';
+import { GeneratedDeck } from '@/lib/models/GeneratedDeck';
+import { getTokenFromRequest, verifyToken } from '@/lib/auth';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
-
-function verifyToken(token: string) {
-  try {
-    return jwt.verify(token, JWT_SECRET) as any;
-  } catch (error) {
-    return null;
-  }
-}
-
-export async function PUT(
+export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   try {
-    const { id } = await params;
-    const authHeader = request.headers.get('authorization');
-    const token = authHeader?.split(' ')[1];
-
-    if (!token) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
+    const token = getTokenFromRequest(request);
+    if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     const decoded = verifyToken(token);
-    if (!decoded) {
-      return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
-    }
+    if (!decoded) return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
 
-    const body = await request.json();
     await connectDB();
+    try { await GeneratedDeck.createCollection(); } catch {}
+    try { await GeneratedDeck.syncIndexes(); } catch {}
+    const doc = await GeneratedDeck.findOne({ _id: id, userId: decoded.userId }).lean();
+    if (!doc) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-    const deck = await Deck.findOneAndUpdate(
-      { id, userId: decoded.id },
-      {
-        ...body,
-        updatedAt: new Date(),
-      },
-      { new: true }
-    );
-
-    if (!deck) {
-      return NextResponse.json({ error: 'Deck not found' }, { status: 404 });
-    }
-
-    return NextResponse.json(deck);
+    return NextResponse.json({
+      id: doc._id.toString(),
+      deckId: doc.deckId,
+      title: doc.title,
+      createdAt: doc.createdAt,
+      deck: doc.deck,
+    });
   } catch (error) {
-    console.error('Update deck error:', error);
+    console.error('Get deck error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
@@ -58,32 +37,19 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   try {
-    const { id } = await params;
-    const authHeader = request.headers.get('authorization');
-    const token = authHeader?.split(' ')[1];
-
-    if (!token) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
+    const token = getTokenFromRequest(request);
+    if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     const decoded = verifyToken(token);
-    if (!decoded) {
-      return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
-    }
+    if (!decoded) return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
 
     await connectDB();
-
-    const result = await Deck.deleteOne({
-      id,
-      userId: decoded.id,
-    });
-
-    if (result.deletedCount === 0) {
-      return NextResponse.json({ error: 'Deck not found' }, { status: 404 });
-    }
-
-    return NextResponse.json({ message: 'Deck deleted' });
+    try { await GeneratedDeck.createCollection(); } catch {}
+    try { await GeneratedDeck.syncIndexes(); } catch {}
+    const res = await GeneratedDeck.deleteOne({ _id: id, userId: decoded.userId });
+    if (res.deletedCount === 0) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Delete deck error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

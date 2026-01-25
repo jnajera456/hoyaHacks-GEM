@@ -1,6 +1,4 @@
 "use client";
-
-import { getAllDecks, getUser, saveUser, deleteDeck as deleteDeckUtil } from '@/utils/deckStorage';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -40,6 +38,8 @@ type GeneratedDeck = {
   };
 };
 
+type DeckRecord = { id: string; deck: GeneratedDeck };
+
 type UserType = {
   id: string;
   name: string;
@@ -67,7 +67,7 @@ export default function AccountPage() {
   const { user: authUser, loading: authLoading, error: authError, logout } = useAuth();
   const router = useRouter();
   const [user, setUser] = useState<UserType | null>(null);
-  const [userDecks, setUserDecks] = useState<GeneratedDeck[]>([]);
+  const [userDecks, setUserDecks] = useState<DeckRecord[]>([]);
   const [activeTab, setActiveTab] = useState<'overview' | 'decks' | 'preferences'>('overview');
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [editForm, setEditForm] = useState({
@@ -81,53 +81,40 @@ export default function AccountPage() {
   });
 
   useEffect(() => {
-    const userData = getUser();
-    const decks = getAllDecks();
-    
-    if (userData) {
-      setUser(userData);
-      setUserDecks(decks);
-      setEditForm({
-        name: userData.name,
-        email: userData.email,
-        theme: userData.preferences?.theme || 'light',
-        notifications: userData.preferences?.notifications !== false,
-        dailyReminder: userData.preferences?.dailyReminder !== false,
-        studyGoal: userData.preferences?.studyGoal || 30,
-        language: userData.preferences?.language || 'en'
-      });
-    } else {
-      const guestUser: UserType = {
-        id: 'guest_' + Date.now(),
-        name: 'Guest User',
-        email: 'guest@studytoks.com',
-        isGuest: true,
-        avatarColor: '#6B7280',
-        preferences: {
-          theme: 'light',
-          notifications: true,
-          dailyReminder: true,
-          studyGoal: 30,
-          language: 'en'
-        },
-        studyStats: {
-          totalStudyTime: 0,
-          daysStudied: 0,
-          longestStreak: 0,
-          averageScore: 0,
-          totalDecks: decks.length,
-          totalFlashcards: decks.reduce((total, deck) => total + deck.materials.length, 0)
+    const load = async () => {
+      try {
+        // who am I
+        const meRes = await fetch('/api/auth/me', { credentials: 'include' });
+        if (meRes.ok) {
+          const me = await meRes.json();
+          setUser({ id: me.user.id, name: me.user.name || '', email: me.user.email });
+          setEditForm((prev) => ({
+            ...prev,
+            name: me.user.name || '',
+            email: me.user.email,
+          }));
         }
-      };
-      saveUser(guestUser);
-      setUser(guestUser);
-      setUserDecks(decks);
-    }
+        // decks
+        const decksRes = await fetch('/api/decks', { credentials: 'include' });
+        if (decksRes.ok) {
+          const data = await decksRes.json();
+          const decks = (data.decks || []).map((d: any) => ({ id: d.id, deck: d.deck }));
+          setUserDecks(decks);
+        }
+      } catch (e) {
+        console.error('Failed to load account data', e);
+      }
+    };
+    load();
   }, []);
 
-  const handleSignOut = () => {
-    localStorage.removeItem('studytoks_user');
-    setUser(null);
+  const handleSignOut = async () => {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
+    } finally {
+      setUser(null);
+      window.location.href = '/login';
+    }
   };
 
   const handleSavePreferences = () => {
@@ -146,32 +133,22 @@ export default function AccountPage() {
       }
     };
     
-    saveUser(updatedUser);
+    // Preferences are local-only for now
     setUser(updatedUser);
     setIsEditingProfile(false);
   };
 
-  const handleDeleteDeck = (deckId: string) => {
-    if (confirm('Delete this deck? This cannot be undone.')) {
-      const success = deleteDeckUtil(deckId);
-      
-      if (success) {
-        const updated = userDecks.filter(d => d.id !== deckId);
-        setUserDecks(updated);
-        
-        if (user) {
-          const updatedUser = {
-            ...user,
-            studyStats: {
-              ...user.studyStats,
-              totalDecks: updated.length,
-              totalFlashcards: updated.reduce((total, deck) => total + deck.materials.length, 0)
-            }
-          };
-          saveUser(updatedUser);
-          setUser(updatedUser);
-        }
-      }
+  const handleDeleteDeck = async (deckId: string) => {
+    if (!confirm('Delete this deck? This cannot be undone.')) return;
+    try {
+      await fetch(`/api/decks/${encodeURIComponent(deckId)}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+      const updated = userDecks.filter(d => d.id !== deckId);
+      setUserDecks(updated);
+    } catch (e) {
+      console.error('Failed to delete deck', e);
     }
   };
 
@@ -188,9 +165,10 @@ export default function AccountPage() {
     URL.revokeObjectURL(url);
   };
 
-  const handleStudyDeck = (deck: GeneratedDeck) => {
-    sessionStorage.setItem('currentDeck', JSON.stringify(deck));
-    window.location.href = '/results';
+  const handleStudyDeck = (record: DeckRecord) => {
+    sessionStorage.setItem('currentDeck', JSON.stringify(record.deck));
+    sessionStorage.setItem('currentDeckId', record.id);
+    window.location.href = `/results?id=${encodeURIComponent(record.id)}`;
   };
 
   const getMaterialTypeStats = (deck: GeneratedDeck) => {
@@ -215,10 +193,27 @@ export default function AccountPage() {
 
   const stats = {
     totalDecks: userDecks.length,
-    totalMaterials: userDecks.reduce((total, deck) => total + deck.materials.length, 0),
+    totalMaterials: userDecks.reduce((total, record) => total + record.deck.materials.length, 0),
     studyTime: user?.studyStats?.totalStudyTime || 0,
     streak: user?.studyStats?.longestStreak || 0,
   };
+
+  const renderEmptyState = () => (
+    <div className="flex flex-col items-center justify-center py-16 px-4">
+      <BookOpen size={64} className="text-gray-300 mb-4" />
+      <h3 className="text-xl font-semibold text-gray-900 mb-2">No Decks Yet</h3>
+      <p className="text-gray-500 text-center mb-6 max-w-md">
+        Start by creating your first study deck from the home page.
+      </p>
+      <Link
+        href="/"
+        className="inline-flex items-center gap-2 rounded-lg bg-purple-600 px-6 py-3 text-sm font-medium text-white hover:bg-purple-700 transition-colors"
+      >
+        <Home size={18} />
+        Go to Home
+      </Link>
+    </div>
+  );
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
@@ -465,10 +460,11 @@ export default function AccountPage() {
                     
                     {userDecks.length > 0 ? (
                       <div className="divide-y divide-gray-200">
-                        {userDecks.slice(0, 3).map((deck) => {
+                        {userDecks.slice(0, 3).map((record) => {
+                          const deck = record.deck;
                           const deckStats = getMaterialTypeStats(deck);
                           return (
-                            <div key={deck.id} className="px-6 py-4 hover:bg-gray-50 transition-colors">
+                            <div key={record.id} className="px-6 py-4 hover:bg-gray-50 transition-colors">
                               <div className="flex items-center justify-between">
                                 <div>
                                   <h4 className="font-medium text-gray-900">{deck.title}</h4>
@@ -483,7 +479,7 @@ export default function AccountPage() {
                                   </div>
                                 </div>
                                 <button
-                                  onClick={() => handleStudyDeck(deck)}
+                                  onClick={() => handleStudyDeck(record)}
                                   className="rounded-lg bg-purple-600 px-4 py-2 text-sm font-medium text-white hover:bg-purple-700 flex items-center gap-2 transition-colors"
                                 >
                                   <BookOpen size={14} />
@@ -531,11 +527,12 @@ export default function AccountPage() {
 
                     {userDecks.length > 0 ? (
                       <div className="divide-y divide-gray-200">
-                        {userDecks.map((deck) => {
+                        {userDecks.map((record) => {
+                          const deck = record.deck;
                           const deckStats = getMaterialTypeStats(deck);
                           
                           return (
-                            <div key={deck.id} className="px-6 py-6 hover:bg-gray-50 transition-colors">
+                            <div key={record.id} className="px-6 py-6 hover:bg-gray-50 transition-colors">
                               <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                                 <div className="flex-1">
                                   <div className="flex items-start gap-4">
@@ -585,7 +582,7 @@ export default function AccountPage() {
                                 
                                 <div className="flex flex-col gap-2 sm:ml-4">
                                   <button
-                                    onClick={() => handleStudyDeck(deck)}
+                                    onClick={() => handleStudyDeck(record)}
                                     className="rounded-lg bg-purple-600 px-4 py-2 text-sm font-medium text-white hover:bg-purple-700 flex items-center justify-center gap-2 transition-colors"
                                   >
                                     <BookOpen size={14} />
@@ -599,7 +596,7 @@ export default function AccountPage() {
                                     Export
                                   </button>
                                   <button
-                                    onClick={() => handleDeleteDeck(deck.id)}
+                                    onClick={() => handleDeleteDeck(record.id)}
                                     className="rounded-lg border border-red-300 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 flex items-center justify-center gap-2 transition-colors"
                                   >
                                     <Trash2 size={14} />

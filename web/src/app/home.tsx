@@ -1,5 +1,4 @@
 "use client";
-import { saveDeck, getUser, saveUser } from '@/utils/deckStorage';
 import { Layout, Typography, Space, Card, Button, Upload, Divider, Input, message, Alert, Progress, Tag } from "antd";
 import { UploadOutlined, FilePdfOutlined, VideoCameraOutlined, FileTextOutlined, CloseOutlined, CheckCircleOutlined, SaveOutlined } from "@ant-design/icons";
 import { useState, useRef } from 'react';
@@ -132,12 +131,11 @@ export default function Home() {
         };
         
         setGeneratedDeck(deck);
-        
-        // Auto-save to account
-        saveDeckToAccount(deck);
-        
         // Store for immediate viewing
         sessionStorage.setItem('currentDeck', JSON.stringify(deck));
+        if (data.savedDeckId) {
+          sessionStorage.setItem('currentDeckId', data.savedDeckId);
+        }
         
       } else {
         message.error(`API error: ${data.error || response.status}`);
@@ -150,30 +148,8 @@ export default function Home() {
     }
   };
 
-  // Save deck function
-  const saveDeckToAccount = (deck: any) => {
-  try {
-    // Save deck using your utility
-    saveDeck(deck);
-    
-    // Update user stats
-    const user = getUser();
-    if (user) {
-      const decks = getAllDecks(); // Import this too
-      const updatedUser = {
-        ...user,
-        studyStats: {
-          ...user.studyStats,
-          totalDecks: decks.length,
-          totalFlashcards: decks.reduce((total, d) => total + d.materials.length, 0)
-        }
-      };
-      saveUser(updatedUser);
-    }
-  } catch (error) {
-    console.error('Error saving deck:', error);
-  }
-};
+  // Persistence handled server-side in /api/generate
+  const saveDeckToAccount = (_deck: any) => {};
 
 
   const getFileIcon = (fileType: string) => {
@@ -354,7 +330,12 @@ export default function Home() {
                     block
                     onClick={() => {
                       sessionStorage.setItem('currentDeck', JSON.stringify(generatedDeck));
-                      router.push('/results');
+                      const id = sessionStorage.getItem('currentDeckId');
+                      if (id) {
+                        router.push(`/results?id=${encodeURIComponent(id)}`);
+                      } else {
+                        router.push('/results');
+                      }
                     }}
                     style={{ marginBottom: 8 }}
                   >

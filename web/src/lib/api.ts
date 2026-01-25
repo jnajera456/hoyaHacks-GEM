@@ -7,51 +7,30 @@
 interface RequestOptions {
   method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
   body?: any;
-  token?: string | null;
 }
 
 // Check if we're in browser
 const isBrowser = typeof window !== 'undefined';
 
-// Get token from localStorage (persisted from auth)
-function getToken(): string | null {
-  if (!isBrowser) return null;
-  return localStorage.getItem('auth_token');
-}
-
-// Set token in localStorage
-function setToken(token: string | null) {
-  if (!isBrowser) return;
-  if (token) {
-    localStorage.setItem('auth_token', token);
-  } else {
-    localStorage.removeItem('auth_token');
-  }
-}
+// No client-side token; we use httpOnly cookies
 
 // Generic API call helper
 async function apiCall(endpoint: string, options: RequestOptions = {}) {
-  const { method = 'GET', body, token } = options;
-  const authToken = token || getToken();
+  const { method = 'GET', body } = options;
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
   };
-
-  if (authToken) {
-    headers['Authorization'] = `Bearer ${authToken}`;
-  }
 
   try {
     const response = await fetch(`/api${endpoint}`, {
       method,
       headers,
       body: body ? JSON.stringify(body) : undefined,
+      credentials: 'include',
     });
 
     if (response.status === 401) {
-      // Token expired or invalid - clear token
-      setToken(null);
       throw new Error('Unauthorized - session expired');
     }
 
@@ -69,32 +48,7 @@ async function apiCall(endpoint: string, options: RequestOptions = {}) {
 }
 
 // Authentication - Simplified for hackathon (no strong security hardening)
-export const authAPI = {
-  signup: async (email: string, password: string, name: string) => {
-    const data = await apiCall('/auth', {
-      method: 'POST',
-      body: { action: 'signup', email, password, name },
-    });
-    setToken(data.token);
-    return data.user;
-  },
-
-  signin: async (email: string, password: string) => {
-    const data = await apiCall('/auth', {
-      method: 'POST',
-      body: { action: 'signin', email, password },
-    });
-    setToken(data.token);
-    return data.user;
-  },
-
-  logout: () => {
-    setToken(null);
-  },
-
-  getToken,
-  setToken,
-};
+export const authAPI = {} as const;
 
 // User Profile
 export const userAPI = {

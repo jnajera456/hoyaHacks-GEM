@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 
 interface StudyMaterial {
@@ -42,22 +42,36 @@ export default function ResultsPage() {
   const touchStartY = useRef(0);
   const touchEndY = useRef(0);
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   useEffect(() => {
-    const savedDeck = sessionStorage.getItem('currentDeck');
-    if (savedDeck) {
-      try {
-        const parsedDeck = JSON.parse(savedDeck);
-        setDeck(parsedDeck);
-      } catch {
-        // Redirect to account page if deck is invalid
+    const load = async () => {
+      const id = searchParams.get('id');
+      if (!id) {
         router.push('/account');
+        return;
       }
-    } else {
-      // Redirect to account page if no deck
+      try {
+        const res = await fetch(`/api/decks/${encodeURIComponent(id)}`, { credentials: 'include' });
+        if (res.ok) {
+          const data = await res.json();
+          if (data?.deck) {
+            setDeck(data.deck);
+            return;
+          }
+        }
+        if (res.status === 404) {
+          alert('This deck was deleted or does not exist.');
+          router.push('/account');
+          return;
+        }
+      } catch (e) {
+        console.error('Failed to load deck', e);
+      }
       router.push('/account');
-    }
-  }, [router]);
+    };
+    load();
+  }, [router, searchParams]);
 
   useEffect(() => {
     if (deck && deck.materials[currentIndex]?.type === 'match_game') {

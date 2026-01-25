@@ -1,11 +1,24 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { NextResponse } from "next/server";
+import { connectDB } from "@/lib/mongodb";
+import { GeneratedDeck } from "@/lib/models/GeneratedDeck";
+import { getTokenFromRequest, verifyToken } from "@/lib/auth";
+import { autoBootstrap } from "@/lib/autoBootstrap";
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
 export async function POST(request) {
   try {
+    const token = getTokenFromRequest(request);
+    const decoded = token ? verifyToken(token) : null;
+    if (!decoded) {
+      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+    }
+
+    await connectDB();
+    await autoBootstrap();
+
     const { text, fileContent, fileName, fileType } = await request.json();
 
     if (!text && !fileContent) {
@@ -182,10 +195,31 @@ Return ONLY a valid JSON array.`;
     console.log(`${deck.stats.visualExamples} examples`);
     console.log(`${deck.stats.games} games`);
 
+    // Persist deck to MongoDB associated with the authenticated user
+    let savedDeckId = null;
+    try {
+      await connectDB();
+      // Ensure collection + indexes exist (idempotent)
+      try { await GeneratedDeck.createCollection(); } catch {}
+      try { await GeneratedDeck.syncIndexes(); } catch {}
+      const doc = new GeneratedDeck({
+        userId: decoded.userId,
+        deckId: deck.id,
+        title: deck.title,
+        deck,
+      });
+      const saved = await doc.save();
+      savedDeckId = saved._id?.toString?.() ?? String(saved._id);
+    } catch (persistError) {
+      console.error("Failed to persist generated deck:", persistError);
+      // Non-fatal: continue to return the generated payload
+    }
+
     return NextResponse.json({
       success: true,
       materials: materials,
       deck: deck,
+      savedDeckId,
       message: `Generated ${materials.length} interactive study materials!`,
     });
 
