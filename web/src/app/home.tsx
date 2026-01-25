@@ -187,8 +187,7 @@ export default function Home() {
           </Title>
         </Header>
 
-    <Layout style={{ minHeight: "100vh" }}>
-      <Content style={{ padding: 16, maxWidth: 520, width: "100%", margin: "0 auto" }}>
+        <Content style={{ padding: 16, maxWidth: 520, width: "100%", margin: "0 auto" }}>
         <Space orientation="vertical" size="large" style={{ width: "100%", marginTop: 8 }}>
           <div>
             <Title level={2} style={{ marginBottom: 0 }}>
@@ -381,11 +380,11 @@ export default function Home() {
         </Space>
       </Content>
 
-      <Footer style={{ textAlign: "center" }}>
-        <Text type="secondary">
-          Upload files or paste text • Powered by Gemini AI
-        </Text>
-      </Footer>
+        <Footer style={{ textAlign: "center" }}>
+          <Text type="secondary">
+            Upload files or paste text • Powered by Gemini AI
+          </Text>
+        </Footer>
       </Layout>
     </ProtectedRoute>
   );
