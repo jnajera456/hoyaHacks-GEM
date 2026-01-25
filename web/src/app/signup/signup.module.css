@@ -1,4 +1,4 @@
-
+/* 
 :global(html) {
   margin: 0;
   padding: 0;
@@ -9,8 +9,8 @@
   margin: 0;
   padding: 0;
   height: 100%;
-  overflow: hidden; /* Keeps the page locked to the screen height */
-}
+  overflow: hidden; /* Keeps the page locked to the screen height 
+} */
 
 .signupLayout {
   height: 100vh;
