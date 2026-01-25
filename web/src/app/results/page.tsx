@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { FileParser } from '@/utils/fileParser';
+import { MarkdownRenderer } from '@/components/MarkdownRenderer';
 
 interface StudyMaterial {
   type: 'flashcard' | 'summary' | 'concept' | 'multiple_choice' | 'visual_example' | 'match_game';
@@ -457,9 +458,7 @@ export default function ResultsPage() {
                   
                   {selectedOption !== null && currentMaterial.explanation && (
                     <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                      <div className="text-blue-800 text-sm">
-                        {currentMaterial.explanation}
-                      </div>
+                      <MarkdownRenderer content={currentMaterial.explanation} className="text-blue-800 text-sm" />
                     </div>
                   )}
                 </div>
@@ -471,8 +470,8 @@ export default function ResultsPage() {
                   <div className="text-xl text-gray-900 font-bold mb-4">
                     {currentMaterial.title}
                   </div>
-                  <div className="text-gray-700 leading-relaxed px-4">
-                    {currentMaterial.content}
+                  <div className="px-4">
+                    <MarkdownRenderer content={currentMaterial.content || ''} className="text-gray-700" />
                   </div>
                 </div>
               )}
@@ -553,14 +552,10 @@ export default function ResultsPage() {
               {/* Concept / Summary */}
               {(currentMaterial.type === 'concept' || currentMaterial.type === 'summary') && (
                 <div className="w-full space-y-4 px-4">
-                  <div className="text-gray-900 text-xl font-semibold text-center">
-                    {currentMaterial.content}
-                  </div>
+                  <MarkdownRenderer content={currentMaterial.content || ''} className="text-gray-900 text-lg" />
                   {currentMaterial.explanation && (
                     <div className="mt-6 p-4 bg-gray-100 border border-gray-300 rounded-lg">
-                      <div className="text-gray-700">
-                        {currentMaterial.explanation}
-                      </div>
+                      <MarkdownRenderer content={currentMaterial.explanation} className="text-gray-700" />
                     </div>
                   )}
                 </div>
