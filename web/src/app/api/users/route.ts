@@ -60,6 +60,10 @@ export async function PUT(request: NextRequest) {
     }
 
     const body = await request.json();
+    // Reject any attempt to update email explicitly
+    if (body && typeof body === 'object' && 'email' in body) {
+      return NextResponse.json({ error: 'Email updates are not allowed' }, { status: 400 });
+    }
     await connectDB();
 
     // Only allow updating name (email should not be changed after creation for simplicity)

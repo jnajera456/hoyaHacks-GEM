@@ -4,10 +4,11 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
+import { FileParser } from '@/utils/fileParser';
 import { 
   User, BookOpen, Download, Trash2, Settings,
   ChevronRight, Moon, Target, LogOut,
-  Edit2, Save, X, Flame, BarChart3, FileText, Home
+  Edit2, Save, X, Flame, BarChart3, FileText, Home, Plus
 } from 'lucide-react';
 
 type StudyMaterial = {
@@ -72,13 +73,18 @@ export default function AccountPage() {
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [editForm, setEditForm] = useState({
     name: '',
-    email: '',
     theme: 'light' as 'light' | 'dark' | 'auto',
     notifications: true,
     dailyReminder: true,
     studyGoal: 30,
     language: 'en'
   });
+
+  const [showAugmentModal, setShowAugmentModal] = useState(false);
+  const [augmentDeckId, setAugmentDeckId] = useState<string | null>(null);
+  const [augmentText, setAugmentText] = useState('');
+  const [augmentFile, setAugmentFile] = useState<File | null>(null);
+  const [augmentLoading, setAugmentLoading] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -91,7 +97,6 @@ export default function AccountPage() {
           setEditForm((prev) => ({
             ...prev,
             name: me.user.name || '',
-            email: me.user.email,
           }));
         }
         // decks
@@ -108,12 +113,23 @@ export default function AccountPage() {
     load();
   }, []);
 
-  const handleSignOut = async () => {
+  const handleSaveProfile = async () => {
     try {
-      await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
-    } finally {
-      setUser(null);
-      window.location.href = '/login';
+      const res = await fetch('/api/users', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ name: editForm.name })
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        setUser((prev) => prev ? { ...prev, name: updated.name } : prev);
+        setIsEditingProfile(false);
+      } else {
+        console.error('Failed to update profile');
+      }
+    } catch (e) {
+      console.error('Error updating profile', e);
     }
   };
 
@@ -123,7 +139,6 @@ export default function AccountPage() {
     const updatedUser: UserType = {
       ...user,
       name: editForm.name,
-      email: editForm.email,
       preferences: {
         theme: editForm.theme,
         notifications: editForm.notifications,
@@ -163,6 +178,81 @@ export default function AccountPage() {
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
+  };
+
+  const handleAugmentFile = async (file: File) => {
+    if (file.size > 10 * 1024 * 1024) {
+      alert('File size must be less than 10MB');
+      return false;
+    }
+    setAugmentFile(file);
+    return false;
+  };
+
+  const handleAugmentSubmit = async () => {
+    if (!augmentDeckId) return;
+    
+    let contentToSend = '';
+    let fileName = '';
+    let fileType = '';
+
+    if (augmentFile) {
+      try {
+        const parsed = await FileParser.parseFile(augmentFile);
+        contentToSend = parsed.text;
+        fileName = augmentFile.name;
+        fileType = augmentFile.type;
+      } catch (error: any) {
+        alert(`Failed to parse file: ${error.message}`);
+        return;
+      }
+    } else if (augmentText.trim()) {
+      contentToSend = augmentText
+        .replace(/\r\n/g, '\n')
+        .replace(/[ \u00A0]+/g, ' ')
+        .replace(/\n{3,}/g, '\n\n')
+        .trim();
+    } else {
+      alert('Please upload a file or enter text');
+      return;
+    }
+
+    if (contentToSend.length < 50) {
+      alert('Content too short (min 50 chars)');
+      return;
+    }
+
+    setAugmentLoading(true);
+    try {
+      const response = await fetch(`/api/decks/${augmentDeckId}/augment`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ text: contentToSend, fileName, fileType })
+      });
+
+      const data = await response.json();
+      if (response.ok && data.success) {
+        alert(`✅ Added ${data.newMaterials.length} materials!`);
+        // Update the deck in state
+        setUserDecks(prev => prev.map(record => 
+          record.id === augmentDeckId 
+            ? { ...record, deck: data.deck }
+            : record
+        ));
+        setShowAugmentModal(false);
+        setAugmentDeckId(null);
+        setAugmentText('');
+        setAugmentFile(null);
+      } else {
+        alert(data.error || 'Failed to augment deck');
+      }
+    } catch (error: any) {
+      console.error('Augment error:', error);
+      alert('Error augmenting deck');
+    } finally {
+      setAugmentLoading(false);
+    }
   };
 
   const handleStudyDeck = (record: DeckRecord) => {
@@ -217,38 +307,7 @@ export default function AccountPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
-      {/* Header */}
-      <header className="sticky top-0 z-50 w-full border-b border-gray-200 bg-white/80 backdrop-blur-sm px-4 py-3">
-        <div className="mx-auto max-w-7xl flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Link 
-              href="/" 
-              className="flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors"
-            >
-              <Home size={20} />
-              <span className="font-medium">Home</span>
-            </Link>
-            <div className="h-6 w-px bg-gray-300" />
-            <h1 className="text-xl font-bold text-gray-900">My Study Decks</h1>
-          </div>
-          
-          {user && (
-            <div className="flex items-center gap-3">
-              <div className="hidden sm:flex flex-col items-end">
-                <span className="text-sm font-medium text-gray-900">{user.name}</span>
-                <span className="text-xs text-gray-500">{user.email}</span>
-              </div>
-              <button
-                onClick={handleSignOut}
-                className="flex items-center gap-2 rounded-lg bg-red-50 px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-100 transition-colors"
-              >
-                <LogOut size={18} />
-                <span className="hidden sm:inline">Sign Out</span>
-              </button>
-            </div>
-          )}
-        </div>
-      </header>
+      {/* Global Navbar is rendered via layout; removed duplicate header */}
 
       {/* Main Content */}
       <main className="mx-auto w-full max-w-7xl px-4 py-8">
@@ -276,16 +335,10 @@ export default function AccountPage() {
                           className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 focus:outline-none"
                           placeholder="Your name"
                         />
-                        <input
-                          type="email"
-                          value={editForm.email}
-                          onChange={(e) => setEditForm({...editForm, email: e.target.value})}
-                          className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 focus:outline-none"
-                          placeholder="Email"
-                        />
+                        {/* Email editing disabled: email is immutable */}
                         <div className="flex gap-2">
                           <button
-                            onClick={handleSavePreferences}
+                            onClick={handleSaveProfile}
                             className="flex-1 rounded-lg bg-purple-600 px-4 py-2 font-medium text-white hover:bg-purple-700 flex items-center justify-center gap-2 transition-colors"
                           >
                             <Save size={18} />
@@ -589,6 +642,16 @@ export default function AccountPage() {
                                     Study
                                   </button>
                                   <button
+                                    onClick={() => {
+                                      setAugmentDeckId(record.id);
+                                      setShowAugmentModal(true);
+                                    }}
+                                    className="rounded-lg border border-green-300 bg-green-50 px-4 py-2 text-sm font-medium text-green-700 hover:bg-green-100 flex items-center justify-center gap-2 transition-colors"
+                                  >
+                                    <Plus size={14} />
+                                    Add Materials
+                                  </button>
+                                  <button
                                     onClick={() => handleExportDeck(deck)}
                                     className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 flex items-center justify-center gap-2 transition-colors"
                                   >
@@ -699,6 +762,75 @@ export default function AccountPage() {
               >
                 Get Started
               </Link>
+            </div>
+          </div>
+        )}
+
+        {/* Augment Deck Modal */}
+        {showAugmentModal && (
+          <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-lg shadow-lg max-w-md w-full max-h-[90vh] overflow-y-auto">
+              <div className="p-6">
+                <h2 className="text-2xl font-bold mb-4">Add Materials to Deck</h2>
+                
+                <div className="space-y-6">
+                  {/* File Upload */}
+                  <div>
+                    <label className="block text-sm font-semibold mb-2">Upload File (PDF/TXT)</label>
+                    <label className="flex items-center justify-center px-4 py-3 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-green-500 hover:bg-green-50 transition">
+                      <input
+                        type="file"
+                        accept=".pdf,.txt"
+                        onChange={(e) => e.target.files && handleAugmentFile(e.target.files[0])}
+                        className="hidden"
+                      />
+                      <span className="text-gray-600">Click to upload</span>
+                    </label>
+                    {augmentFile && (
+                      <div className="mt-2 text-sm text-gray-700">Selected: <strong>{augmentFile.name}</strong></div>
+                    )}
+                  </div>
+
+                  <div className="relative flex items-center">
+                    <div className="flex-grow border-t border-gray-300"></div>
+                    <span className="px-3 text-gray-500 text-sm">OR</span>
+                    <div className="flex-grow border-t border-gray-300"></div>
+                  </div>
+
+                  {/* Text Input */}
+                  <div>
+                    <label className="block text-sm font-semibold mb-2">Paste Text</label>
+                    <textarea
+                      value={augmentText}
+                      onChange={(e) => setAugmentText(e.target.value)}
+                      placeholder="Paste new material here (min 50 chars)..."
+                      className="w-full min-h-[120px] p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                    />
+                  </div>
+                </div>
+
+                {/* Buttons */}
+                <div className="flex gap-3 mt-6">
+                  <button
+                    onClick={() => {
+                      setShowAugmentModal(false);
+                      setAugmentDeckId(null);
+                      setAugmentText('');
+                      setAugmentFile(null);
+                    }}
+                    className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleAugmentSubmit}
+                    disabled={augmentLoading}
+                    className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {augmentLoading ? 'Adding...' : 'Add Materials'}
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         )}

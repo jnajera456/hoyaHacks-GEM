@@ -85,17 +85,39 @@ export default function Home() {
     const readyFile = uploadedFiles.find(f => f.status === 'ready');
     
     if (readyFile && readyFile.parsedContent) {
-      // Use file content
+      // Use file content (already normalized by parser)
       contentToSend = readyFile.parsedContent.text;
       fileName = readyFile.file.name;
       fileType = readyFile.file.type;
     } else if (text.trim()) {
-      // Use text input
-      contentToSend = text;
+      // Use text input (normalize it for consistency with file parsing)
+      contentToSend = text
+        .replace(/\r\n/g, '\n')        // CRLF → LF
+        .replace(/[ \u00A0]+/g, ' ')   // Collapse repeated spaces
+        .replace(/\n{3,}/g, '\n\n')    // Collapse 3+ newlines to 2
+        .trim();
     } else {
       message.error('Please upload a file or paste some text first!');
       return;
     }
+
+    // Validate content length before sending to Gemini
+    const MAX_CONTENT_LENGTH = 10000;
+    if (contentToSend.length > MAX_CONTENT_LENGTH) {
+      message.warning(`Content exceeds ${MAX_CONTENT_LENGTH} characters. Truncating...`);
+      contentToSend = contentToSend.substring(0, MAX_CONTENT_LENGTH) + '\n... [truncated]';
+    }
+
+    if (contentToSend.length < 50) {
+      message.error('Content is too short. Please provide at least 50 characters.');
+      return;
+    }
+
+    console.log('📤 Sending to Gemini:', {
+      source: readyFile ? `File: ${fileName}` : 'Text input',
+      contentLength: contentToSend.length,
+      pageCount: readyFile?.parsedContent?.metadata.pages
+    });
 
     setLoading(true);
     setGeneratedDeck(null);
@@ -106,7 +128,6 @@ export default function Home() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           text: contentToSend,
-          fileContent: readyFile ? contentToSend : undefined,
           fileName,
           fileType
         })
@@ -162,12 +183,6 @@ export default function Home() {
   return (
     <ProtectedRoute>
       <Layout style={{ minHeight: "100vh" }}>
-        <Header style={{ display: "flex", alignItems: "center" }}>
-          <Title level={4} style={{ color: "white", margin: 0 }}>
-            StudyToks - AI Study Assistant
-          </Title>
-        </Header>
-
         <Content style={{ padding: 16, maxWidth: 520, width: "100%", margin: "0 auto" }}>
         <Space orientation="vertical" size="large" style={{ width: "100%", marginTop: 8 }}>
           <div>
