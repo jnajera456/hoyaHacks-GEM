@@ -96,7 +96,7 @@ READABILITY REQUIREMENTS (critical):
     const response = await result.response;
     const geminiText = response.text();
 
-    console.log("✅ Received response");
+    console.log("Received response");
 
     let materials = [];
     try {

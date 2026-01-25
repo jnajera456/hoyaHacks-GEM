@@ -37,12 +37,12 @@ export function verifyToken(token: string): { userId: string } | null {
   try {
     const decoded = jwt.verify(token, JWT_SECRET) as { userId: string };
     if (process.env.NODE_ENV !== 'production') {
-      console.log('✅ Token verified successfully for userId:', decoded.userId);
+      console.log('Token verified successfully for userId:', decoded.userId);
     }
     return decoded;
   } catch (error) {
     if (process.env.NODE_ENV !== 'production') {
-      console.error('❌ Token verification failed:', error instanceof Error ? error.message : 'Unknown error');
+      console.error('Token verification failed:', error instanceof Error ? error.message : 'Unknown error');
       console.error('   Token preview:', token.substring(0, 20) + '...');
       console.error('   JWT_SECRET exists:', !!JWT_SECRET, 'Length:', JWT_SECRET.length);
     }

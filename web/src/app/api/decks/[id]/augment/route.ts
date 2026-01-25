@@ -39,7 +39,7 @@ export async function POST(
       return NextResponse.json({ error: 'Please provide content to add' }, { status: 400 });
     }
 
-    console.log("📚 Augmenting existing deck:", {
+    console.log("Augmenting existing deck:", {
       deckId: id,
       currentMaterials: existingDeck.materials.length,
       newContentLength: text.length
@@ -181,7 +181,7 @@ STRICT RULES:
         };
       });
 
-      console.log(`✅ Generated ${newMaterials.length} new materials`);
+      console.log(`Generated ${newMaterials.length} new materials`);
     } catch (parseError: any) {
       console.error("Parse error:", parseError.message);
       return NextResponse.json(
@@ -215,7 +215,7 @@ STRICT RULES:
       return NextResponse.json({ error: 'Failed to update deck' }, { status: 500 });
     }
 
-    console.log(`📚 Deck augmented: ${existingDeck.materials.length} → ${mergedMaterials.length} materials`);
+    console.log(`Deck augmented: ${existingDeck.materials.length} → ${mergedMaterials.length} materials`);
 
     return NextResponse.json({
       success: true,

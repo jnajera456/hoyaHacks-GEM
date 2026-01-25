@@ -7,8 +7,8 @@ import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { FileParser } from '@/utils/fileParser';
 import { 
   User, BookOpen, Trash2, Settings,
-  ChevronRight, Moon, Target, LogOut,
-  Edit2, Save, X, Flame, BarChart3, FileText, Home, Plus
+  ChevronRight, LogOut,
+  Edit2, Save, X, BarChart3, FileText, Home, Plus
 } from 'lucide-react';
 
 type StudyMaterial = {
@@ -47,21 +47,6 @@ type UserType = {
   email: string;
   isGuest?: boolean;
   avatarColor?: string;
-  preferences?: {
-    theme: 'light' | 'dark' | 'auto';
-    notifications: boolean;
-    dailyReminder: boolean;
-    studyGoal: number;
-    language: string;
-  };
-  studyStats?: {
-    totalStudyTime: number;
-    daysStudied: number;
-    longestStreak: number;
-    averageScore: number;
-    totalDecks?: number;
-    totalFlashcards?: number;
-  };
 };
 
 export default function AccountPage() {
@@ -69,15 +54,10 @@ export default function AccountPage() {
   const router = useRouter();
   const [user, setUser] = useState<UserType | null>(null);
   const [userDecks, setUserDecks] = useState<DeckRecord[]>([]);
-  const [activeTab, setActiveTab] = useState<'overview' | 'decks' | 'preferences'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'decks'>('overview');
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [editForm, setEditForm] = useState({
     name: '',
-    theme: 'light' as 'light' | 'dark' | 'auto',
-    notifications: true,
-    dailyReminder: true,
-    studyGoal: 30,
-    language: 'en'
   });
 
   const [showAugmentModal, setShowAugmentModal] = useState(false);
@@ -134,26 +114,6 @@ export default function AccountPage() {
     } catch (e) {
       console.error('Error updating profile', e);
     }
-  };
-
-  const handleSavePreferences = () => {
-    if (!user) return;
-    
-    const updatedUser: UserType = {
-      ...user,
-      name: editForm.name,
-      preferences: {
-        theme: editForm.theme,
-        notifications: editForm.notifications,
-        dailyReminder: editForm.dailyReminder,
-        studyGoal: editForm.studyGoal,
-        language: editForm.language
-      }
-    };
-    
-    // Preferences are local-only for now
-    setUser(updatedUser);
-    setIsEditingProfile(false);
   };
 
   const handleDeleteDeck = async (deckId: string) => {
@@ -252,7 +212,7 @@ export default function AccountPage() {
 
       const data = await response.json();
       if (response.ok && data.success) {
-        alert(`✅ Added ${data.newMaterials.length} materials!`);
+        alert(`Added ${data.newMaterials.length} materials!`);
         // Update the deck in state
         setUserDecks(prev => prev.map(record => 
           record.id === augmentDeckId 
@@ -303,8 +263,6 @@ export default function AccountPage() {
   const stats = {
     totalDecks: userDecks.length,
     totalMaterials: userDecks.reduce((total, record) => total + record.deck.materials.length, 0),
-    studyTime: user?.studyStats?.totalStudyTime || 0,
-    streak: user?.studyStats?.longestStreak || 0,
   };
 
   const renderEmptyState = () => (
@@ -427,21 +385,6 @@ export default function AccountPage() {
                   </div>
                   <ChevronRight size={18} className={activeTab === 'decks' ? 'text-[#fa541c]' : 'text-gray-400'} />
                 </button>
-                
-                <button
-                  onClick={() => setActiveTab('preferences')}
-                  className={`flex w-full items-center justify-between px-6 py-4 transition-colors hover:bg-gray-50 ${
-                    activeTab === 'preferences' 
-                      ? 'border-l-4 border-orange-500 bg-orange-50 text-orange-700' 
-                      : 'text-gray-700'
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <Settings size={20} className={activeTab === 'preferences' ? 'text-[#fa541c]' : 'text-gray-400'} />
-                    <span className="font-medium">Preferences</span>
-                  </div>
-                  <ChevronRight size={18} className={activeTab === 'preferences' ? 'text-[#fa541c]' : 'text-gray-400'} />
-                </button>
               </div>
 
               {/* Quick Stats */}
@@ -455,13 +398,6 @@ export default function AccountPage() {
                   <div className="flex items-center justify-between">
                     <span className="text-gray-600">Total Materials</span>
                     <span className="font-bold text-gray-900">{stats.totalMaterials}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-gray-600">Streak</span>
-                    <span className="flex items-center font-bold text-gray-900">
-                      <Flame size={16} className="mr-1.5 text-orange-500" />
-                      {stats.streak} days
-                    </span>
                   </div>
                 </div>
               </div>
@@ -505,15 +441,6 @@ export default function AccountPage() {
                       <div className="text-gray-600">Total Materials</div>
                     </div>
 
-                    <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-                      <div className="mb-4">
-                        <div className="inline-flex rounded-lg bg-orange-50 p-3">
-                          <Flame className="text-orange-600" size={24} />
-                        </div>
-                      </div>
-                      <div className="text-3xl font-bold text-gray-900">{stats.streak}</div>
-                      <div className="text-gray-600">Day Streak</div>
-                    </div>
                   </div>
 
                   {/* Recent Decks */}
@@ -705,67 +632,6 @@ export default function AccountPage() {
                         </Link>
                       </div>
                     )}
-                  </div>
-                </div>
-              )}
-
-              {activeTab === 'preferences' && (
-                <div className="space-y-6">
-                  <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
-                    <div className="border-b border-gray-200 px-6 py-4">
-                      <h3 className="text-lg font-bold text-gray-900">Preferences</h3>
-                    </div>
-                    
-                    <div className="p-6 space-y-8">
-                      <div>
-                        <h4 className="mb-4 flex items-center text-lg font-medium text-gray-900">
-                          <Moon size={20} className="mr-2" />
-                          Theme
-                        </h4>
-                        <div className="grid grid-cols-3 gap-3">
-                          {['light', 'dark', 'auto'].map((theme) => (
-                            <button
-                              key={theme}
-                              onClick={() => setEditForm({...editForm, theme: theme as any})}
-                              className={`rounded-lg border p-4 text-center capitalize transition-colors ${
-                                editForm.theme === theme 
-                                  ? 'border-orange-500 bg-orange-50 text-orange-700' 
-                                  : 'border-gray-200 text-gray-700 hover:bg-gray-50'
-                              }`}
-                            >
-                              {theme}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-
-                      <div>
-                        <h4 className="mb-4 flex items-center text-lg font-medium text-gray-900">
-                          <Target size={20} className="mr-2" />
-                          Daily Goal
-                        </h4>
-                        <div className="mb-2 flex items-center justify-between">
-                          <span className="text-gray-700">Study Goal</span>
-                          <span className="font-medium text-[#fa541c]">{editForm.studyGoal} min</span>
-                        </div>
-                        <input
-                          type="range"
-                          min="10"
-                          max="120"
-                          step="5"
-                          value={editForm.studyGoal}
-                          onChange={(e) => setEditForm({...editForm, studyGoal: parseInt(e.target.value)})}
-                          className="w-full"
-                        />
-                      </div>
-
-                      <button
-                        onClick={handleSavePreferences}
-                        className="w-full rounded-lg bg-[#fa541c] px-6 py-3 font-medium text-white hover:bg-[#ff7a45] transition-colors"
-                      >
-                        Save Preferences
-                      </button>
-                    </div>
                   </div>
                 </div>
               )}

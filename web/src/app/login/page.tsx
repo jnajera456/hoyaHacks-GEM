@@ -1,5 +1,5 @@
 'use client';
-import { Button, Checkbox, Form, Input, Layout, Typography, message } from 'antd';
+import { Button, Form, Input, Layout, Typography, message } from 'antd';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
@@ -9,9 +9,8 @@ const { Content } = Layout;
 const { Title, Paragraph } = Typography;
 
 interface LoginValues {
-  email?: string;
-  password?: string;
-  remember?: boolean;
+  email: string;
+  password: string;
 }
 
 const LoginPage = () => {
@@ -30,9 +29,6 @@ const LoginPage = () => {
   
       const data = await response.json();
       if (response.ok) {
-        if (process.env.NODE_ENV !== 'production') {
-          console.log('login success (no token logged)');
-        }
         message.success('Login successful!');
         router.push('/');
       } else {
@@ -54,8 +50,7 @@ const LoginPage = () => {
             Welcome Back
           </Title>
           <Paragraph className={styles.welcomeParagraph}>
-            Sign in to access your account, manage your preferences, and pick up right where you left off. 
-            If you’re new here, create an account to get started in minutes.
+            Sign in to access your account and pick up right where you left off.
           </Paragraph>
         </div>
 
@@ -75,10 +70,9 @@ const LoginPage = () => {
 
             <Form
               name="normal_login"
-              layout="vertical" // Ensures labels sit on top of inputs
-              initialValues={{ remember: true }}
+              layout="vertical"
               onFinish={onFinish}
-              requiredMark={false} // Removes the red asterisks for a cleaner look
+              requiredMark={false}
               className={styles.loginForm}
             >
               <Form.Item
@@ -106,16 +100,6 @@ const LoginPage = () => {
                 />
               </Form.Item>
 
-              <div className={styles.formActions} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '24px' }}>
-                <Form.Item name="remember" valuePropName="checked" noStyle>
-                  <Checkbox className={styles.rememberMe}>Remember Me</Checkbox>
-                </Form.Item>
-
-                <Link href="" style={{ color: '#fa541c', fontWeight: '600' }}>
-                  Forgot your password?
-                </Link>
-              </div>
-
               <Form.Item>
                 <Button
                   type="primary"
@@ -123,7 +107,7 @@ const LoginPage = () => {
                   loading={loading}
                   className={styles.loginFormButton}
                 >
-                  Sign in now
+                  Sign in
                 </Button>
               </Form.Item>
             </Form>

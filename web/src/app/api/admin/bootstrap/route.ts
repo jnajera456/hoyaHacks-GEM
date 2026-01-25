@@ -19,6 +19,10 @@ export async function GET(request: NextRequest) {
     await ensureDbIndexes();
 
     const db = mongoose.connection.db;
+    if (!db) {
+      return NextResponse.json({ error: 'Database not connected' }, { status: 500 });
+    }
+    
     const collections = await db.listCollections().toArray();
 
     return NextResponse.json({

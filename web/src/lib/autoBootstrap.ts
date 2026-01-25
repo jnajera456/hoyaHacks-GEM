@@ -12,9 +12,9 @@ export async function autoBootstrap() {
   try {
     await ensureDbIndexes();
     bootstrapComplete = true;
-    console.log('✅ Database bootstrap complete');
+    console.log('Database bootstrap complete');
   } catch (error) {
-    console.error('⚠️  Database bootstrap failed:', error);
+    console.error('Database bootstrap failed:', error);
     // Don't block requests on bootstrap failure
   }
 }

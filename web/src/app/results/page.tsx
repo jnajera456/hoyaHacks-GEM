@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { FileParser } from '@/utils/fileParser';
@@ -26,7 +26,7 @@ interface GeneratedDeck {
   generatedAt: string;
 }
 
-export default function ResultsPage() {
+function ResultsContent() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [deck, setDeck] = useState<GeneratedDeck | null>(null);
   const [showAnswer, setShowAnswer] = useState(false);
@@ -579,5 +579,13 @@ export default function ResultsPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function ResultsPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <ResultsContent />
+    </Suspense>
   );
 }

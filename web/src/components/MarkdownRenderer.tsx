@@ -18,12 +18,14 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, cla
           ul: ({ node, ...props }) => <ul className="list-disc list-inside mb-3 space-y-1" {...props} />,
           ol: ({ node, ...props }) => <ol className="list-decimal list-inside mb-3 space-y-1" {...props} />,
           li: ({ node, ...props }) => <li className="ml-2" {...props} />,
-          code: ({ node, inline, ...props }) => 
-            inline ? (
+          code: ({ node, ...props }: any) => {
+            const isInline = !props.className;
+            return isInline ? (
               <code className="bg-gray-100 px-2 py-1 rounded text-sm font-mono" {...props} />
             ) : (
               <code className="block bg-gray-100 p-2 rounded mb-3 text-sm font-mono overflow-x-auto" {...props} />
-            ),
+            );
+          },
           blockquote: ({ node, ...props }) => (
             <blockquote className="border-l-4 border-gray-300 pl-4 my-3 italic text-gray-700" {...props} />
           ),

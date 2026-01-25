@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
     }
 
     await connectDB();
-    const sessions = await StudySession.find({ userId: decoded.id }).sort({
+    const sessions = await StudySession.find({ userId: decoded.userId }).sort({
       date: -1,
     });
 
@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
 
     const session = new StudySession({
       id: `session_${Date.now()}`,
-      userId: decoded.id,
+      userId: decoded.userId,
       ...body,
       date: new Date(),
     });

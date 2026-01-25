@@ -12,7 +12,7 @@ export async function POST(request) {
       );
     }
 
-    console.log("🎙️ Generating audio for text:", text.substring(0, 100) + "...");
+    console.log("Generating audio for text:", text.substring(0, 100) + "...");
 
     const audioBuffer = await textToSpeech(text);
 

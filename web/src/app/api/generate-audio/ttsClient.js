@@ -38,7 +38,7 @@ export async function textToSpeech(text) {
     } catch {
       errorMessage = await response.text();
     }
-    console.error(`❌ ElevenLabs error (${response.status}):`, errorMessage);
+    console.error(`ElevenLabs error (${response.status}):`, errorMessage);
     throw new Error(`ElevenLabs TTS error: ${response.status} - ${errorMessage}`);
   }
 
