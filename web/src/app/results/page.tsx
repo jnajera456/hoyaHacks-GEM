@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { FileParser } from '@/utils/fileParser';
 import { MarkdownRenderer } from '@/components/MarkdownRenderer';
+import { AudioFeedback } from '@/utils/audioFeedback';
 
 interface StudyMaterial {
   type: 'flashcard' | 'summary' | 'concept' | 'multiple_choice' | 'visual_example' | 'match_game';
@@ -194,6 +195,11 @@ export default function ResultsPage() {
   };
 
   useEffect(() => {
+    // Initialize audio feedback
+    audioFeedback.current = new AudioFeedback();
+  }, []);
+
+  useEffect(() => {
     const load = async () => {
       const id = searchParams.get('id');
       if (!id) {
@@ -317,7 +323,15 @@ export default function ResultsPage() {
   const handleOptionSelect = (index: number, correctIndex: number) => {
     if (selectedOption !== null) return;
     setSelectedOption(index);
-    setIsCorrect(index === correctIndex);
+    const isAnswerCorrect = index === correctIndex;
+    setIsCorrect(isAnswerCorrect);
+    if (audioFeedback.current) {
+      if (isAnswerCorrect) {
+        audioFeedback.current.playCorrect();
+      } else {
+        audioFeedback.current.playIncorrect();
+      }
+    }
   };
 
   const handleMatchSelection = (type: 'term' | 'def', index: number) => {
@@ -339,10 +353,16 @@ export default function ResultsPage() {
     const defOriginalIdx = shuffledDefs[defIdx].index;
     
     if (termOriginalIdx === defOriginalIdx) {
+      if (audioFeedback.current) {
+        audioFeedback.current.playCorrect();
+      }
       setMatchedPairs(prev => [...prev, termOriginalIdx]);
       setSelectedTerm(null);
       setSelectedDef(null);
     } else {
+      if (audioFeedback.current) {
+        audioFeedback.current.playIncorrect();
+      }
       setTimeout(() => {
         setSelectedTerm(null);
         setSelectedDef(null);
