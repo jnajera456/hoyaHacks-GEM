@@ -11,6 +11,7 @@ const { Title, Text } = Typography;
 interface SignupValues {
   email?: string;
   password?: string;
+  name?: string;
 }
 
 const SignupPage = () => {
@@ -20,23 +21,18 @@ const SignupPage = () => {
 
   const onFinish = async (values: SignupValues) => {
     try {
-      const response = await fetch('/api/signup', {
+      const response = await fetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(values),
       });
   
       if (response.ok) {
-        // 1. Show success message at the top of the screen
-        message.success('Account created successfully! Please sign in.');
-  
-        // 2. Redirect to the login page after a short delay
-        setTimeout(() => {
-          router.push('/login');
-        }, 2000); 
+        message.success('Account created successfully! Redirecting to login...');
+        router.push('/login');
       } else {
         const data = await response.json();
-        message.error(data.message || 'Signup failed');
+        message.error(data.error || 'Signup failed');
       }
     } catch (error) {
       message.error('Connection error. Please try again.');
@@ -78,6 +74,16 @@ const SignupPage = () => {
               requiredMark={false}
               className={styles.signupForm}
             >
+              <Form.Item
+                label="Name"
+                name="name"
+                rules={[
+                  { required: false }
+                ]}
+              >
+                <Input placeholder="Your name (optional)" className={styles.inputField} />
+              </Form.Item>
+
               <Form.Item
                 label="Email"
                 name="email"

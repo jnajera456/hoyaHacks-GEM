@@ -3,6 +3,9 @@
 import { getAllDecks, getUser, saveUser, deleteDeck as deleteDeckUtil } from '@/utils/deckStorage';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/hooks/useAuth';
+import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { 
   User, BookOpen, Download, Trash2, Settings,
   ChevronRight, Moon, Target, LogOut,
@@ -61,6 +64,8 @@ type UserType = {
 };
 
 export default function AccountPage() {
+  const { user: authUser, loading: authLoading, error: authError, logout } = useAuth();
+  const router = useRouter();
   const [user, setUser] = useState<UserType | null>(null);
   const [userDecks, setUserDecks] = useState<GeneratedDeck[]>([]);
   const [activeTab, setActiveTab] = useState<'overview' | 'decks' | 'preferences'>('overview');
