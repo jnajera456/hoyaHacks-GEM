@@ -2,17 +2,7 @@ import { connectDB } from '@/lib/mongodb';
 import { GeneratedContent } from '@/lib/models/GeneratedContent';
 import { Topic } from '@/lib/models/Topic';
 import { NextRequest, NextResponse } from 'next/server';
-import jwt from 'jsonwebtoken';
-
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
-
-function verifyToken(token: string) {
-  try {
-    return jwt.verify(token, JWT_SECRET) as any;
-  } catch (error) {
-    return null;
-  }
-}
+import { getTokenFromRequest, verifyToken } from '@/lib/auth';
 
 /**
  * GET /api/topics/[id]/generated - List all generated content for a topic
@@ -24,9 +14,7 @@ export async function GET(
 ) {
   const { id } = await params;
   try {
-    const authHeader = request.headers.get('authorization');
-    const token = authHeader?.split(' ')[1];
-
+    const token = getTokenFromRequest(request);
     if (!token) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -93,9 +81,7 @@ export async function POST(
 ) {
   const { id } = await params;
   try {
-    const authHeader = request.headers.get('authorization');
-    const token = authHeader?.split(' ')[1];
-
+    const token = getTokenFromRequest(request);
     if (!token) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }

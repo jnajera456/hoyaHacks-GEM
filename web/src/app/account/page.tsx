@@ -1,43 +1,24 @@
 "use client";
-
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { 
-  User, 
-  BookOpen, 
-  Clock, 
-  Star, 
-  Download, 
-  Trash2, 
-  Settings, 
-  History, 
-  TrendingUp, 
-  ChevronRight,
-  Bell,
-  Moon,
-  Globe,
-  Calendar,
-  Target,
-  LogOut,
-  Edit2,
-  Save,
-  X,
-  Flame,
-  BarChart3,
-  FileText,
-  Share2,
-  ExternalLink
+  User, BookOpen, Download, Trash2, Settings,
+  ChevronRight, Moon, Target, LogOut,
+  Edit2, Save, X, Flame, BarChart3, FileText, Home
 } from 'lucide-react';
 
-// Updated types to match what Gemini generates
 type StudyMaterial = {
-  type: 'flashcard' | 'summary' | 'concept';
-  content: string;
+  type: 'flashcard' | 'summary' | 'concept' | 'multiple_choice' | 'visual_example' | 'match_game';
+  content?: string;
+  question?: string;
+  options?: string[];
+  correctIndex?: number;
   explanation?: string;
-  tags?: string[];
+  title?: string;
+  pairs?: Array<{term: string; definition: string}>;
   id: string;
 };
 
@@ -47,9 +28,18 @@ type GeneratedDeck = {
   materials: StudyMaterial[];
   sourceText?: string;
   generatedAt: string;
+  stats?: {
+    totalMaterials: number;
+    multipleChoice?: number;
+    flashcards?: number;
+    concepts?: number;
+    visualExamples?: number;
+    games?: number;
+  };
 };
 
-// Keep your existing UserType, StudySession types as they are
+type DeckRecord = { id: string; deck: GeneratedDeck };
+
 type UserType = {
   id: string;
   name: string;
@@ -73,23 +63,12 @@ type UserType = {
   };
 };
 
-type StudySession = {
-  id: string;
-  deckId: string;
-  deckTitle: string;
-  date: string;
-  duration: number;
-  score: number;
-  cardsStudied: number;
-};
-
 export default function AccountPage() {
   const { user: authUser, loading: authLoading, error: authError, logout } = useAuth();
   const router = useRouter();
   const [user, setUser] = useState<UserType | null>(null);
-  const [userDecks, setUserDecks] = useState<GeneratedDeck[]>([]);
-  const [studySessions, setStudySessions] = useState<StudySession[]>([]);
-  const [activeTab, setActiveTab] = useState<'overview' | 'decks' | 'history' | 'preferences'>('overview');
+  const [userDecks, setUserDecks] = useState<DeckRecord[]>([]);
+  const [activeTab, setActiveTab] = useState<'overview' | 'decks' | 'preferences'>('overview');
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [editForm, setEditForm] = useState({
     name: '',
@@ -101,98 +80,42 @@ export default function AccountPage() {
     language: 'en'
   });
 
-  // Initialize user from auth context
   useEffect(() => {
-    if (!authLoading && !authUser) {
-      router.push('/login');
-      return;
-    }
-
-    if (authUser) {
-      const userData: UserType = {
-        id: authUser.id,
-        name: authUser.name || 'User',
-        email: authUser.email,
-        avatarColor: '#7C3AED',
-        preferences: {
-          theme: 'light',
-          notifications: true,
-          dailyReminder: true,
-          studyGoal: 30,
-          language: 'en'
-        },
-        studyStats: {
-          totalStudyTime: 0,
-          daysStudied: 0,
-          longestStreak: 0,
-          averageScore: 0,
-          totalDecks: 0,
-          totalFlashcards: 0
-        }
-      };
-      setUser(userData);
-      setEditForm({
-        name: userData.name,
-        email: userData.email,
-        theme: 'light',
-        notifications: true,
-        dailyReminder: true,
-        studyGoal: 30,
-        language: 'en'
-      });
-    }
-  }, [authUser, authLoading, router]);
-
-  // Load decks and study sessions from localStorage
-  useEffect(() => {
-    const savedDecks = localStorage.getItem('studyDecks');
-    
-    if (savedDecks) {
+    const load = async () => {
       try {
-        const decks = JSON.parse(savedDecks);
-        setUserDecks(decks);
-        
-        // Update user stats with deck count
-        if (user) {
-          const totalFlashcards = decks.reduce((total: number, deck: GeneratedDeck) => 
-            total + deck.materials.filter(m => m.type === 'flashcard').length, 0);
-          
-          const updatedUser: UserType = {
-            ...user,
-            studyStats: {
-              totalStudyTime: user.studyStats?.totalStudyTime || 0,
-              daysStudied: user.studyStats?.daysStudied || 0,
-              longestStreak: user.studyStats?.longestStreak || 0,
-              averageScore: user.studyStats?.averageScore || 0,
-              totalDecks: decks.length,
-              totalFlashcards: totalFlashcards
-            }
-          };
-          setUser(updatedUser);
+        // who am I
+        const meRes = await fetch('/api/auth/me', { credentials: 'include' });
+        if (meRes.ok) {
+          const me = await meRes.json();
+          setUser({ id: me.user.id, name: me.user.name || '', email: me.user.email });
+          setEditForm((prev) => ({
+            ...prev,
+            name: me.user.name || '',
+            email: me.user.email,
+          }));
         }
-      } catch (error) {
-        console.error('Error parsing decks:', error);
+        // decks
+        const decksRes = await fetch('/api/decks', { credentials: 'include' });
+        if (decksRes.ok) {
+          const data = await decksRes.json();
+          const decks = (data.decks || []).map((d: any) => ({ id: d.id, deck: d.deck }));
+          setUserDecks(decks);
+        }
+      } catch (e) {
+        console.error('Failed to load account data', e);
       }
-    }
-    
-    // Load study sessions
-    const savedSessions = localStorage.getItem('studytoks_sessions');
-    if (savedSessions) {
-      setStudySessions(JSON.parse(savedSessions));
-    }
-  }, [user]);
+    };
+    load();
+  }, []);
 
   const handleSignOut = async () => {
-    await logout();
+    try {
+      await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
+    } finally {
+      setUser(null);
+      window.location.href = '/login';
+    }
   };
-
-  if (authLoading || !user) {
-    return (
-      <ProtectedRoute>
-        <div className="flex items-center justify-center min-h-screen">Loading account...</div>
-      </ProtectedRoute>
-    );
-  }
 
   const handleSavePreferences = () => {
     if (!user) return;
@@ -210,38 +133,22 @@ export default function AccountPage() {
       }
     };
     
-    localStorage.setItem('studytoks_user', JSON.stringify(updatedUser));
+    // Preferences are local-only for now
     setUser(updatedUser);
     setIsEditingProfile(false);
   };
 
-  const handleDeleteDeck = (deckId: string) => {
-    if (confirm('Are you sure you want to delete this deck? This action cannot be undone.')) {
+  const handleDeleteDeck = async (deckId: string) => {
+    if (!confirm('Delete this deck? This cannot be undone.')) return;
+    try {
+      await fetch(`/api/decks/${encodeURIComponent(deckId)}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
       const updated = userDecks.filter(d => d.id !== deckId);
       setUserDecks(updated);
-      localStorage.setItem('studyDecks', JSON.stringify(updated));
-      
-      // Update user stats
-      if (user) {
-        const totalFlashcards = updated.reduce((total: number, deck: GeneratedDeck) => 
-          total + deck.materials.filter(m => m.type === 'flashcard').length, 0);
-        
-        const updatedUser: UserType = {
-          ...user,
-          studyStats: {
-            totalStudyTime: user.studyStats?.totalStudyTime || 0,
-            daysStudied: user.studyStats?.daysStudied || 0,
-            longestStreak: user.studyStats?.longestStreak || 0,
-            averageScore: user.studyStats?.averageScore || 0,
-            totalDecks: updated.length,
-            totalFlashcards: totalFlashcards
-          }
-        };
-        setUser(updatedUser);
-        localStorage.setItem('studytoks_user', JSON.stringify(updatedUser));
-      }
-      
-      alert('Deck deleted successfully!');
+    } catch (e) {
+      console.error('Failed to delete deck', e);
     }
   };
 
@@ -258,178 +165,191 @@ export default function AccountPage() {
     URL.revokeObjectURL(url);
   };
 
-  const handleExportAllData = () => {
-    const userData = {
-      user,
-      decks: userDecks,
-      studySessions,
-      exportedAt: new Date().toISOString()
+  const handleStudyDeck = (record: DeckRecord) => {
+    sessionStorage.setItem('currentDeck', JSON.stringify(record.deck));
+    sessionStorage.setItem('currentDeckId', record.id);
+    window.location.href = `/results?id=${encodeURIComponent(record.id)}`;
+  };
+
+  const getMaterialTypeStats = (deck: GeneratedDeck) => {
+    const stats = {
+      multipleChoice: 0,
+      flashcards: 0,
+      concepts: 0,
+      visualExamples: 0,
+      games: 0
     };
-    
-    const dataStr = JSON.stringify(userData, null, 2);
-    const dataBlob = new Blob([dataStr], { type: 'application/json' });
-    const url = URL.createObjectURL(dataBlob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `studytoks-data-export-${new Date().toISOString().split('T')[0]}.json`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+
+    deck.materials.forEach(m => {
+      if (m.type === 'multiple_choice') stats.multipleChoice++;
+      else if (m.type === 'flashcard') stats.flashcards++;
+      else if (m.type === 'concept') stats.concepts++;
+      else if (m.type === 'visual_example') stats.visualExamples++;
+      else if (m.type === 'match_game') stats.games++;
+    });
+
+    return stats;
   };
 
-  const handleStudyDeck = (deck: GeneratedDeck) => {
-    // Store the deck in session storage for the results page
-    sessionStorage.setItem('currentDeck', JSON.stringify(deck));
-    window.location.href = '/results';
-  };
-
-  // Calculate stats
   const stats = {
     totalDecks: userDecks.length,
-    totalFlashcards: userDecks.reduce((total, deck) => 
-      total + deck.materials.filter(m => m.type === 'flashcard').length, 0),
-    totalMaterials: userDecks.reduce((total, deck) => total + deck.materials.length, 0),
+    totalMaterials: userDecks.reduce((total, record) => total + record.deck.materials.length, 0),
     studyTime: user?.studyStats?.totalStudyTime || 0,
-    mastery: user?.studyStats?.averageScore || 78,
     streak: user?.studyStats?.longestStreak || 0,
-    daysStudied: user?.studyStats?.daysStudied || 0
   };
 
-  // Format time in hours and minutes
-  const formatTime = (minutes: number) => {
-    const hours = Math.floor(minutes / 60);
-    const mins = minutes % 60;
-    return hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
-  };
-
-  // Get recent sessions (last 5)
-  const recentSessions = studySessions.slice(0, 5);
-
-  // Calculate today's study time (mock for demo)
-  const todayStudyTime = 45;
-
-  // Get unique subjects from deck tags
-  const getDeckSubjects = (deck: GeneratedDeck) => {
-    const allTags = deck.materials.flatMap(m => m.tags || []);
-    const uniqueTags = [...new Set(allTags)];
-    return uniqueTags.slice(0, 3);
-  };
+  const renderEmptyState = () => (
+    <div className="flex flex-col items-center justify-center py-16 px-4">
+      <BookOpen size={64} className="text-gray-300 mb-4" />
+      <h3 className="text-xl font-semibold text-gray-900 mb-2">No Decks Yet</h3>
+      <p className="text-gray-500 text-center mb-6 max-w-md">
+        Start by creating your first study deck from the home page.
+      </p>
+      <Link
+        href="/"
+        className="inline-flex items-center gap-2 rounded-lg bg-purple-600 px-6 py-3 text-sm font-medium text-white hover:bg-purple-700 transition-colors"
+      >
+        <Home size={18} />
+        Go to Home
+      </Link>
+    </div>
+  );
 
   return (
-    <ProtectedRoute>
-      <div className="min-h-screen bg-gray-50">
-        {/* Header */}
-        <header className="bg-white border-b border-gray-200 sticky top-0 z-50 px-4 py-4 shadow-sm sm:px-6 lg:px-8">
-          <div className="max-w-7xl mx-auto flex justify-between items-center">
-            <div className="flex items-center space-x-4">
-              <Link href="/" className="text-gray-600 hover:text-gray-900 flex items-center">
-                <span className="mr-2">←</span> Back to Home
-              </Link>
-              <h1 className="text-2xl font-bold text-gray-900">My Study Decks</h1>
-            </div>
-            {user && (
+    <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
+      {/* Header */}
+      <header className="sticky top-0 z-50 w-full border-b border-gray-200 bg-white/80 backdrop-blur-sm px-4 py-3">
+        <div className="mx-auto max-w-7xl flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Link 
+              href="/" 
+              className="flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors"
+            >
+              <Home size={20} />
+              <span className="font-medium">Home</span>
+            </Link>
+            <div className="h-6 w-px bg-gray-300" />
+            <h1 className="text-xl font-bold text-gray-900">My Study Decks</h1>
+          </div>
+          
+          {user && (
+            <div className="flex items-center gap-3">
+              <div className="hidden sm:flex flex-col items-end">
+                <span className="text-sm font-medium text-gray-900">{user.name}</span>
+                <span className="text-xs text-gray-500">{user.email}</span>
+              </div>
               <button
                 onClick={handleSignOut}
-                className="px-4 py-2 bg-red-50 text-red-700 border border-red-200 rounded-lg hover:bg-red-100 flex items-center space-x-2 transition-colors"
+                className="flex items-center gap-2 rounded-lg bg-red-50 px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-100 transition-colors"
               >
                 <LogOut size={18} />
-                <span>Sign Out</span>
+                <span className="hidden sm:inline">Sign Out</span>
               </button>
-            )}
-          </div>
-        </header>
+            </div>
+          )}
+        </div>
+      </header>
 
-      <main className="container mx-auto px-4 py-8 sm:px-6 lg:px-8">
-        {!user ? (
-          <div className="text-center py-12">Loading...</div>
-        ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 md:gap-8">
-            {/* Left Sidebar - Profile & Navigation */}
+      {/* Main Content */}
+      <main className="mx-auto w-full max-w-7xl px-4 py-8">
+        {user ? (
+          <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
+            {/* Left Sidebar */}
             <div className="lg:col-span-1 space-y-6">
               {/* Profile Card */}
-              <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
-                <div className="flex flex-col items-center">
-                  <div 
-                    className="w-24 h-24 rounded-full flex items-center justify-center mb-4 text-white text-3xl font-bold"
-                    style={{ backgroundColor: user.avatarColor || '#7C3AED' }}
-                  >
-                    {user.name.charAt(0)}
-                  </div>
-                  {isEditingProfile ? (
-                    <div className="w-full space-y-4">
-                      <input
-                        type="text"
-                        value={editForm.name}
-                        onChange={(e) => setEditForm({...editForm, name: e.target.value})}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg"
-                        placeholder="Your name"
-                      />
-                      <input
-                        type="email"
-                        value={editForm.email}
-                        onChange={(e) => setEditForm({...editForm, email: e.target.value})}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg"
-                        placeholder="Email"
-                      />
-                      <div className="flex space-x-2">
-                        <button
-                          onClick={handleSavePreferences}
-                          className="flex-1 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 flex items-center justify-center space-x-2"
-                        >
-                          <Save size={18} />
-                          <span>Save</span>
-                        </button>
-                        <button
-                          onClick={() => setIsEditingProfile(false)}
-                          className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
-                        >
-                          <X size={18} />
-                        </button>
-                      </div>
+              <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+                <div className="p-6">
+                  <div className="flex flex-col items-center">
+                    <div 
+                      className="mb-4 flex h-24 w-24 items-center justify-center rounded-full text-3xl font-bold text-white"
+                      style={{ backgroundColor: user.avatarColor || '#7C3AED' }}
+                    >
+                      {user.name.charAt(0)}
                     </div>
-                  ) : (
-                    <>
-                      <h2 className="text-xl font-bold text-gray-900">{user.name}</h2>
-                      <p className="text-gray-600 text-sm mt-1">{user.email}</p>
-                      {user.isGuest && (
-                        <span className="inline-block mt-2 px-3 py-1 bg-yellow-100 text-yellow-800 rounded-full text-sm">
-                          Guest Account
-                        </span>
-                      )}
-                      <button
-                        onClick={() => setIsEditingProfile(true)}
-                        className="mt-4 px-4 py-2 text-purple-600 hover:bg-purple-50 rounded-lg flex items-center space-x-2"
-                      >
-                        <Edit2 size={16} />
-                        <span>Edit Profile</span>
-                      </button>
-                    </>
-                  )}
+                    
+                    {isEditingProfile ? (
+                      <div className="w-full space-y-4">
+                        <input
+                          type="text"
+                          value={editForm.name}
+                          onChange={(e) => setEditForm({...editForm, name: e.target.value})}
+                          className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 focus:outline-none"
+                          placeholder="Your name"
+                        />
+                        <input
+                          type="email"
+                          value={editForm.email}
+                          onChange={(e) => setEditForm({...editForm, email: e.target.value})}
+                          className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 focus:outline-none"
+                          placeholder="Email"
+                        />
+                        <div className="flex gap-2">
+                          <button
+                            onClick={handleSavePreferences}
+                            className="flex-1 rounded-lg bg-purple-600 px-4 py-2 font-medium text-white hover:bg-purple-700 flex items-center justify-center gap-2 transition-colors"
+                          >
+                            <Save size={18} />
+                            Save
+                          </button>
+                          <button
+                            onClick={() => setIsEditingProfile(false)}
+                            className="rounded-lg border border-gray-300 px-4 py-2 hover:bg-gray-50 transition-colors"
+                          >
+                            <X size={18} />
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <h2 className="text-xl font-bold text-gray-900">{user.name}</h2>
+                        <p className="mt-1 text-sm text-gray-600">{user.email}</p>
+                        {user.isGuest && (
+                          <span className="mt-2 inline-block rounded-full bg-yellow-100 px-3 py-1 text-sm text-yellow-800">
+                            Guest Account
+                          </span>
+                        )}
+                        <button
+                          onClick={() => setIsEditingProfile(true)}
+                          className="mt-4 flex items-center gap-2 rounded-lg px-4 py-2 text-purple-600 hover:bg-purple-50 transition-colors"
+                        >
+                          <Edit2 size={16} />
+                          <span className="font-medium">Edit Profile</span>
+                        </button>
+                      </>
+                    )}
+                  </div>
                 </div>
               </div>
 
               {/* Navigation */}
-              <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+              <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
                 <button
                   onClick={() => setActiveTab('overview')}
-                  className={`w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors ${activeTab === 'overview' ? 'bg-purple-50 border-l-4 border-purple-600' : ''}`}
+                  className={`flex w-full items-center justify-between px-6 py-4 transition-colors hover:bg-gray-50 ${
+                    activeTab === 'overview' 
+                      ? 'border-l-4 border-purple-600 bg-purple-50 text-purple-700' 
+                      : 'text-gray-700'
+                  }`}
                 >
-                  <div className="flex items-center space-x-3">
+                  <div className="flex items-center gap-3">
                     <BarChart3 size={20} className={activeTab === 'overview' ? 'text-purple-600' : 'text-gray-400'} />
-                    <span className={activeTab === 'overview' ? 'font-medium text-purple-700' : 'text-gray-700'}>Overview</span>
+                    <span className="font-medium">Overview</span>
                   </div>
                   <ChevronRight size={18} className={activeTab === 'overview' ? 'text-purple-600' : 'text-gray-400'} />
                 </button>
                 
                 <button
                   onClick={() => setActiveTab('decks')}
-                  className={`w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors ${activeTab === 'decks' ? 'bg-purple-50 border-l-4 border-purple-600' : ''}`}
+                  className={`flex w-full items-center justify-between px-6 py-4 transition-colors hover:bg-gray-50 ${
+                    activeTab === 'decks' 
+                      ? 'border-l-4 border-purple-600 bg-purple-50 text-purple-700' 
+                      : 'text-gray-700'
+                  }`}
                 >
-                  <div className="flex items-center space-x-3">
+                  <div className="flex items-center gap-3">
                     <BookOpen size={20} className={activeTab === 'decks' ? 'text-purple-600' : 'text-gray-400'} />
-                    <span className={activeTab === 'decks' ? 'font-medium text-purple-700' : 'text-gray-700'}>My Decks</span>
-                    <span className="bg-gray-100 text-gray-600 text-xs px-2 py-1 rounded-full">
+                    <span className="font-medium">My Decks</span>
+                    <span className="rounded-full bg-gray-100 px-2 py-1 text-xs text-gray-600">
                       {userDecks.length}
                     </span>
                   </div>
@@ -437,48 +357,37 @@ export default function AccountPage() {
                 </button>
                 
                 <button
-                  onClick={() => setActiveTab('history')}
-                  className={`w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors ${activeTab === 'history' ? 'bg-purple-50 border-l-4 border-purple-600' : ''}`}
-                >
-                  <div className="flex items-center space-x-3">
-                    <History size={20} className={activeTab === 'history' ? 'text-purple-600' : 'text-gray-400'} />
-                    <span className={activeTab === 'history' ? 'font-medium text-purple-700' : 'text-gray-700'}>Study History</span>
-                  </div>
-                  <ChevronRight size={18} className={activeTab === 'history' ? 'text-purple-600' : 'text-gray-400'} />
-                </button>
-                
-                <button
                   onClick={() => setActiveTab('preferences')}
-                  className={`w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors ${activeTab === 'preferences' ? 'bg-purple-50 border-l-4 border-purple-600' : ''}`}
+                  className={`flex w-full items-center justify-between px-6 py-4 transition-colors hover:bg-gray-50 ${
+                    activeTab === 'preferences' 
+                      ? 'border-l-4 border-purple-600 bg-purple-50 text-purple-700' 
+                      : 'text-gray-700'
+                  }`}
                 >
-                  <div className="flex items-center space-x-3">
+                  <div className="flex items-center gap-3">
                     <Settings size={20} className={activeTab === 'preferences' ? 'text-purple-600' : 'text-gray-400'} />
-                    <span className={activeTab === 'preferences' ? 'font-medium text-purple-700' : 'text-gray-700'}>Preferences</span>
+                    <span className="font-medium">Preferences</span>
                   </div>
                   <ChevronRight size={18} className={activeTab === 'preferences' ? 'text-purple-600' : 'text-gray-400'} />
                 </button>
               </div>
 
               {/* Quick Stats */}
-              <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
-                <h3 className="font-bold text-gray-900 mb-4">Quick Stats</h3>
-                <div className="space-y-3">
+              <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+                <h3 className="mb-4 text-lg font-bold text-gray-900">Quick Stats</h3>
+                <div className="space-y-4">
                   <div className="flex items-center justify-between">
-                    <span className="text-gray-600 text-sm">Total Decks</span>
-                    <span className="font-medium">{stats.totalDecks}</span>
+                    <span className="text-gray-600">Total Decks</span>
+                    <span className="font-bold text-gray-900">{stats.totalDecks}</span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-gray-600 text-sm">Flashcards</span>
-                    <span className="font-medium">{stats.totalFlashcards}</span>
+                    <span className="text-gray-600">Total Materials</span>
+                    <span className="font-bold text-gray-900">{stats.totalMaterials}</span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-gray-600 text-sm">Study Time</span>
-                    <span className="font-medium">{formatTime(stats.studyTime)}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-gray-600 text-sm">Current Streak</span>
-                    <span className="font-medium flex items-center">
-                      <Flame size={14} className="text-orange-500 mr-1" />
+                    <span className="text-gray-600">Streak</span>
+                    <span className="flex items-center font-bold text-gray-900">
+                      <Flame size={16} className="mr-1.5 text-orange-500" />
                       {stats.streak} days
                     </span>
                   </div>
@@ -487,120 +396,109 @@ export default function AccountPage() {
             </div>
 
             {/* Main Content Area */}
-            <div className="lg:col-span-3">
-              {/* Overview Tab */}
+            <div className="lg:col-span-2">
               {activeTab === 'overview' && (
-                <div className="space-y-8">
-                  {/* Welcome Card */}
-                  <div className="bg-gradient-to-r from-purple-600 to-blue-600 rounded-xl p-8 text-white">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h2 className="text-2xl font-bold mb-2 leading-tight">Welcome back, {user.name.split(' ')[0]}! 👋</h2>
-                        <p className="text-purple-100">
-                          {stats.totalDecks > 0 
-                            ? `You have ${stats.totalDecks} study decks with ${stats.totalFlashcards} flashcards.`
-                            : 'Generate your first study deck to get started!'}
-                        </p>
-                      </div>
-                      <div className="hidden md:block">
-                        <div className="text-center">
-                          <div className="text-4xl font-bold">{stats.mastery}%</div>
-                          <div className="text-purple-200">Mastery Score</div>
-                        </div>
-                      </div>
+                <div className="space-y-6">
+                  {/* Welcome Banner */}
+                  <div className="overflow-hidden rounded-2xl bg-gradient-to-r from-purple-600 to-blue-600 p-8 text-white">
+                    <div>
+                      <h2 className="text-2xl font-bold">Welcome back, {user.name.split(' ')[0]}! 👋</h2>
+                      <p className="mt-2 text-purple-100">
+                        {stats.totalDecks > 0 
+                          ? `You have ${stats.totalDecks} study decks with ${stats.totalMaterials} materials.`
+                          : 'Generate your first study deck to get started!'}
+                      </p>
                     </div>
                   </div>
 
-                  {/* Stats Grid */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                    <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
-                      <div className="flex items-center justify-between mb-4">
-                        <div className="p-2 bg-blue-50 rounded-lg">
+                  {/* Stats Cards */}
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                    <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+                      <div className="mb-4">
+                        <div className="inline-flex rounded-lg bg-blue-50 p-3">
                           <BookOpen className="text-blue-600" size={24} />
                         </div>
                       </div>
-                      <div className="text-2xl font-bold text-gray-900">{stats.totalDecks}</div>
-                      <div className="text-gray-600">Total Decks</div>
+                      <div className="text-3xl font-bold text-gray-900">{stats.totalDecks}</div>
+                      <div className="text-gray-600">Study Decks</div>
                     </div>
 
-                    <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
-                      <div className="flex items-center justify-between mb-4">
-                        <div className="p-2 bg-green-50 rounded-lg">
+                    <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+                      <div className="mb-4">
+                        <div className="inline-flex rounded-lg bg-green-50 p-3">
                           <FileText className="text-green-600" size={24} />
                         </div>
                       </div>
-                      <div className="text-2xl font-bold text-gray-900">{stats.totalFlashcards}</div>
-                      <div className="text-gray-600">Flashcards</div>
+                      <div className="text-3xl font-bold text-gray-900">{stats.totalMaterials}</div>
+                      <div className="text-gray-600">Total Materials</div>
                     </div>
 
-                    <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
-                      <div className="flex items-center justify-between mb-4">
-                        <div className="p-2 bg-purple-50 rounded-lg">
-                          <Star className="text-purple-600" size={24} />
-                        </div>
-                      </div>
-                      <div className="text-2xl font-bold text-gray-900">{stats.mastery}%</div>
-                      <div className="text-gray-600">Average Mastery</div>
-                    </div>
-
-                    <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
-                      <div className="flex items-center justify-between mb-4">
-                        <div className="p-2 bg-orange-50 rounded-lg">
+                    <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+                      <div className="mb-4">
+                        <div className="inline-flex rounded-lg bg-orange-50 p-3">
                           <Flame className="text-orange-600" size={24} />
                         </div>
                       </div>
-                      <div className="text-2xl font-bold text-gray-900">{stats.streak}</div>
+                      <div className="text-3xl font-bold text-gray-900">{stats.streak}</div>
                       <div className="text-gray-600">Day Streak</div>
                     </div>
                   </div>
 
                   {/* Recent Decks */}
-                  <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-                    <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
-                      <h3 className="font-bold text-gray-900">Recent Decks</h3>
-                      <Link href="/" className="text-purple-600 hover:text-purple-700 text-sm font-medium">
-                        + Create New
-                      </Link>
+                  <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+                    <div className="border-b border-gray-200 px-6 py-4">
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-lg font-bold text-gray-900">Recent Decks</h3>
+                        <Link 
+                          href="/" 
+                          className="text-sm font-medium text-purple-600 hover:text-purple-700"
+                        >
+                          + Create New
+                        </Link>
+                      </div>
                     </div>
+                    
                     {userDecks.length > 0 ? (
                       <div className="divide-y divide-gray-200">
-                        {userDecks.slice(0, 3).map((deck) => (
-                          <div key={deck.id} className="px-6 py-4 hover:bg-gray-50 transition-colors">
-                            <div className="flex items-center justify-between">
-                              <div>
-                                <h4 className="font-medium text-gray-900">{deck.title}</h4>
-                                <div className="flex items-center space-x-4 mt-1 text-sm text-gray-600">
-                                  <span className="flex items-center">
-                                    <Calendar size={14} className="mr-1" />
-                                    {new Date(deck.generatedAt).toLocaleDateString()}
-                                  </span>
-                                  <span>{deck.materials.length} materials</span>
-                                  <span>{deck.materials.filter(m => m.type === 'flashcard').length} flashcards</span>
+                        {userDecks.slice(0, 3).map((record) => {
+                          const deck = record.deck;
+                          const deckStats = getMaterialTypeStats(deck);
+                          return (
+                            <div key={record.id} className="px-6 py-4 hover:bg-gray-50 transition-colors">
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <h4 className="font-medium text-gray-900">{deck.title}</h4>
+                                  <div className="mt-2 flex items-center gap-3 text-sm text-gray-600">
+                                    <span className="flex items-center gap-1">
+                                      📅 {new Date(deck.generatedAt).toLocaleDateString()}
+                                    </span>
+                                    {deckStats.multipleChoice > 0 && <span>🎯 {deckStats.multipleChoice}</span>}
+                                    {deckStats.flashcards > 0 && <span>📚 {deckStats.flashcards}</span>}
+                                    {deckStats.visualExamples > 0 && <span>🎨 {deckStats.visualExamples}</span>}
+                                    {deckStats.games > 0 && <span>🎮 {deckStats.games}</span>}
+                                  </div>
                                 </div>
-                              </div>
-                              <div className="flex items-center space-x-4">
                                 <button
-                                  onClick={() => handleStudyDeck(deck)}
-                                  className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 flex items-center space-x-2 text-sm"
+                                  onClick={() => handleStudyDeck(record)}
+                                  className="rounded-lg bg-purple-600 px-4 py-2 text-sm font-medium text-white hover:bg-purple-700 flex items-center gap-2 transition-colors"
                                 >
                                   <BookOpen size={14} />
-                                  <span>Study</span>
+                                  Study
                                 </button>
                               </div>
                             </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     ) : (
-                      <div className="px-6 py-8 text-center text-gray-500">
+                      <div className="px-6 py-12 text-center">
                         <BookOpen size={48} className="mx-auto mb-4 text-gray-300" />
-                        <p>No study decks yet</p>
-                        <p className="text-sm mt-2">Generate study materials on the home page to create your first deck</p>
+                        <p className="text-gray-500">No study decks yet</p>
                         <Link 
                           href="/" 
-                          className="inline-block mt-4 px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm font-medium"
+                          className="mt-4 inline-block rounded-lg bg-purple-600 px-6 py-2 font-medium text-white hover:bg-purple-700"
                         >
-                          Go to Home
+                          Create First Deck
                         </Link>
                       </div>
                     )}
@@ -608,95 +506,101 @@ export default function AccountPage() {
                 </div>
               )}
 
-              {/* Decks Tab */}
               {activeTab === 'decks' && (
                 <div className="space-y-6">
-                  <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
-                    <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
-                      <div>
-                        <h3 className="font-bold text-gray-900">My Study Decks</h3>
-                        <p className="text-sm text-gray-600 mt-1">All your generated study materials</p>
-                      </div>
-                      <div className="flex space-x-3">
-                        <button
-                          onClick={handleExportAllData}
-                          className="px-4 py-2 border border-purple-600 text-purple-600 rounded-lg hover:bg-purple-50 flex items-center space-x-2"
-                        >
-                          <Download size={18} />
-                          <span>Export All</span>
-                        </button>
+                  <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+                    <div className="border-b border-gray-200 px-6 py-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h3 className="text-lg font-bold text-gray-900">My Study Decks</h3>
+                          <p className="mt-1 text-sm text-gray-600">All your generated study materials</p>
+                        </div>
                         <Link
                           href="/"
-                          className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 flex items-center space-x-2"
+                          className="rounded-lg bg-purple-600 px-4 py-2 font-medium text-white hover:bg-purple-700 flex items-center gap-2 transition-colors"
                         >
                           <BookOpen size={18} />
-                          <span>Create New</span>
+                          Create New
                         </Link>
                       </div>
                     </div>
 
                     {userDecks.length > 0 ? (
                       <div className="divide-y divide-gray-200">
-                        {userDecks.map((deck) => {
-                          const flashcardCount = deck.materials.filter(m => m.type === 'flashcard').length;
-                          const summaryCount = deck.materials.filter(m => m.type === 'summary').length;
-                          const conceptCount = deck.materials.filter(m => m.type === 'concept').length;
-                          const tags = getDeckSubjects(deck);
-
+                        {userDecks.map((record) => {
+                          const deck = record.deck;
+                          const deckStats = getMaterialTypeStats(deck);
+                          
                           return (
-                            <div key={deck.id} className="px-6 py-4 hover:bg-gray-50 transition-colors">
-                              <div className="flex items-start justify-between">
+                            <div key={record.id} className="px-6 py-6 hover:bg-gray-50 transition-colors">
+                              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                                 <div className="flex-1">
-                                  <div className="flex items-start space-x-4">
-                                    <div className="p-3 bg-purple-50 rounded-lg">
-                                      <BookOpen className="text-purple-600" size={20} />
-                                    </div>
-                                    <div>
-                                      <h4 className="font-bold text-gray-900">{deck.title}</h4>
-                                      <p className="text-gray-600 text-sm mt-1">
-                                        {deck.sourceText || "Generated from study materials"}
-                                      </p>
-                                      <div className="flex flex-wrap gap-2 mt-3">
-                                        {tags.map((tag, index) => (
-                                          <span key={index} className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded">
-                                            {tag}
-                                          </span>
-                                        ))}
+                                  <div className="flex items-start gap-4">
+                                    <div className="hidden sm:flex">
+                                      <div className="rounded-lg bg-purple-50 p-3">
+                                        <BookOpen className="text-purple-600" size={20} />
                                       </div>
-                                      <div className="flex items-center space-x-4 mt-3 text-sm text-gray-500">
-                                        <span className="flex items-center">
-                                          <FileText size={14} className="mr-1" />
-                                          {flashcardCount} flashcards, {summaryCount} summaries, {conceptCount} concepts
-                                        </span>
-                                        <span className="flex items-center">
-                                          <Calendar size={14} className="mr-1" />
-                                          {new Date(deck.generatedAt).toLocaleDateString()}
-                                        </span>
+                                    </div>
+                                    <div className="flex-1">
+                                      <h4 className="font-bold text-gray-900">{deck.title}</h4>
+                                      <p className="mt-1 text-sm text-gray-600">
+                                        {deck.materials.length} interactive study materials
+                                      </p>
+                                      <div className="mt-3 flex flex-wrap gap-2">
+                                        {deckStats.multipleChoice > 0 && (
+                                          <span className="rounded bg-pink-100 px-2 py-1 text-xs text-pink-700">
+                                            🎯 {deckStats.multipleChoice} Quizzes
+                                          </span>
+                                        )}
+                                        {deckStats.flashcards > 0 && (
+                                          <span className="rounded bg-blue-100 px-2 py-1 text-xs text-blue-700">
+                                            📚 {deckStats.flashcards} Flashcards
+                                          </span>
+                                        )}
+                                        {deckStats.visualExamples > 0 && (
+                                          <span className="rounded bg-green-100 px-2 py-1 text-xs text-green-700">
+                                            🎨 {deckStats.visualExamples} Examples
+                                          </span>
+                                        )}
+                                        {deckStats.games > 0 && (
+                                          <span className="rounded bg-purple-100 px-2 py-1 text-xs text-purple-700">
+                                            🎮 {deckStats.games} Games
+                                          </span>
+                                        )}
+                                        {deckStats.concepts > 0 && (
+                                          <span className="rounded bg-yellow-100 px-2 py-1 text-xs text-yellow-700">
+                                            💡 {deckStats.concepts} Concepts
+                                          </span>
+                                        )}
+                                      </div>
+                                      <div className="mt-3 text-sm text-gray-500">
+                                        Created {new Date(deck.generatedAt).toLocaleDateString()}
                                       </div>
                                     </div>
                                   </div>
                                 </div>
-                                <div className="flex flex-col space-y-2 ml-4">
+                                
+                                <div className="flex flex-col gap-2 sm:ml-4">
                                   <button
-                                    onClick={() => handleStudyDeck(deck)}
-                                    className="px-3 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 flex items-center justify-center space-x-2 text-sm font-medium"
+                                    onClick={() => handleStudyDeck(record)}
+                                    className="rounded-lg bg-purple-600 px-4 py-2 text-sm font-medium text-white hover:bg-purple-700 flex items-center justify-center gap-2 transition-colors"
                                   >
                                     <BookOpen size={14} />
-                                    <span>Study</span>
+                                    Study
                                   </button>
                                   <button
                                     onClick={() => handleExportDeck(deck)}
-                                    className="px-3 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 flex items-center justify-center space-x-2 text-sm font-medium"
+                                    className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 flex items-center justify-center gap-2 transition-colors"
                                   >
                                     <Download size={14} />
-                                    <span>Export</span>
+                                    Export
                                   </button>
                                   <button
-                                    onClick={() => handleDeleteDeck(deck.id)}
-                                    className="px-3 py-2 border border-red-300 text-red-600 rounded-lg hover:bg-red-50 flex items-center justify-center space-x-2 text-sm font-medium"
+                                    onClick={() => handleDeleteDeck(record.id)}
+                                    className="rounded-lg border border-red-300 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 flex items-center justify-center gap-2 transition-colors"
                                   >
                                     <Trash2 size={14} />
-                                    <span>Delete</span>
+                                    Delete
                                   </button>
                                 </div>
                               </div>
@@ -707,15 +611,12 @@ export default function AccountPage() {
                     ) : (
                       <div className="px-6 py-12 text-center">
                         <BookOpen size={64} className="mx-auto mb-4 text-gray-300" />
-                        <p className="text-gray-500 text-lg">No saved decks yet</p>
-                        <p className="text-gray-400 mt-2 max-w-md mx-auto">
-                          Generate some flashcards on the home page and they'll automatically appear here!
-                        </p>
+                        <p className="text-lg text-gray-500">No saved decks yet</p>
                         <Link 
                           href="/" 
-                          className="inline-block mt-6 px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-medium"
+                          className="mt-6 inline-block rounded-lg bg-purple-600 px-6 py-3 font-medium text-white hover:bg-purple-700"
                         >
-                          Go to Home
+                          Create Your First Deck
                         </Link>
                       </div>
                     )}
@@ -723,267 +624,85 @@ export default function AccountPage() {
                 </div>
               )}
 
-              {/* History Tab */}
-              {activeTab === 'history' && (
-                <div className="space-y-6">
-                  <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
-                    <div className="px-6 py-4 border-b border-gray-200">
-                      <h3 className="font-bold text-gray-900">Study History</h3>
-                      <p className="text-sm text-gray-600 mt-1">Track all your past study sessions</p>
-                    </div>
-                    
-                    <div className="divide-y divide-gray-200">
-                      {studySessions.map((session) => (
-                        <div key={session.id} className="px-6 py-4 hover:bg-gray-50 transition-colors">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-start space-x-4">
-                              <div className={`p-3 rounded-lg ${session.score >= 80 ? 'bg-green-50' : session.score >= 60 ? 'bg-yellow-50' : 'bg-red-50'}`}>
-                                <TrendingUp className={session.score >= 80 ? 'text-green-600' : session.score >= 60 ? 'text-yellow-600' : 'text-red-600'} size={20} />
-                              </div>
-                              <div>
-                                <h4 className="font-bold text-gray-900">{session.deckTitle}</h4>
-                                <div className="flex items-center space-x-4 mt-2 text-sm text-gray-600">
-                                  <span className="flex items-center">
-                                    <Calendar size={14} className="mr-1" />
-                                    {new Date(session.date).toLocaleDateString('en-US', { 
-                                      weekday: 'short', 
-                                      month: 'short', 
-                                      day: 'numeric',
-                                      hour: '2-digit',
-                                      minute: '2-digit'
-                                    })}
-                                  </span>
-                                  <span className="flex items-center">
-                                    <Clock size={14} className="mr-1" />
-                                    {session.duration} minutes
-                                  </span>
-                                  <span className="flex items-center">
-                                    <FileText size={14} className="mr-1" />
-                                    {session.cardsStudied} cards
-                                  </span>
-                                </div>
-                              </div>
-                            </div>
-                            <div className="flex items-center space-x-6">
-                              <div className="text-right">
-                                <div className={`text-2xl font-bold ${session.score >= 80 ? 'text-green-600' : session.score >= 60 ? 'text-yellow-600' : 'text-red-600'}`}>
-                                  {session.score}%
-                                </div>
-                                <div className="text-xs text-gray-500">Score</div>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                    
-                    {studySessions.length === 0 && (
-                      <div className="px-6 py-12 text-center">
-                        <History size={64} className="mx-auto mb-4 text-gray-300" />
-                        <p className="text-gray-500 text-lg">No study history yet</p>
-                        <p className="text-gray-400 mt-2 max-w-md mx-auto">
-                          Start studying your decks to build your study history and track progress over time.
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Preferences Tab */}
               {activeTab === 'preferences' && (
                 <div className="space-y-6">
-                  <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
-                    <div className="px-6 py-4 border-b border-gray-200">
-                      <h3 className="font-bold text-gray-900">Preferences</h3>
-                      <p className="text-sm text-gray-600 mt-1">Customize your StudyToks experience</p>
+                  <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+                    <div className="border-b border-gray-200 px-6 py-4">
+                      <h3 className="text-lg font-bold text-gray-900">Preferences</h3>
                     </div>
                     
                     <div className="p-6 space-y-8">
-                      {/* Theme Settings */}
                       <div>
-                        <h4 className="font-medium text-gray-900 mb-4 flex items-center">
-                          <Moon size={18} className="mr-2" />
-                          Theme Settings
+                        <h4 className="mb-4 flex items-center text-lg font-medium text-gray-900">
+                          <Moon size={20} className="mr-2" />
+                          Theme
                         </h4>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                          <button
-                            onClick={() => setEditForm({...editForm, theme: 'light'})}
-                            className={`p-4 border rounded-lg text-center ${editForm.theme === 'light' ? 'border-purple-600 bg-purple-50' : 'border-gray-200 hover:bg-gray-50'}`}
-                          >
-                            <div className="text-lg mb-2">🌞</div>
-                            <div className="font-medium">Light</div>
-                          </button>
-                          <button
-                            onClick={() => setEditForm({...editForm, theme: 'dark'})}
-                            className={`p-4 border rounded-lg text-center ${editForm.theme === 'dark' ? 'border-purple-600 bg-purple-50' : 'border-gray-200 hover:bg-gray-50'}`}
-                          >
-                            <div className="text-lg mb-2">🌙</div>
-                            <div className="font-medium">Dark</div>
-                          </button>
-                          <button
-                            onClick={() => setEditForm({...editForm, theme: 'auto'})}
-                            className={`p-4 border rounded-lg text-center ${editForm.theme === 'auto' ? 'border-purple-600 bg-purple-50' : 'border-gray-200 hover:bg-gray-50'}`}
-                          >
-                            <div className="text-lg mb-2">⚙️</div>
-                            <div className="font-medium">Auto</div>
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Notifications */}
-                      <div>
-                        <h4 className="font-medium text-gray-900 mb-4 flex items-center">
-                          <Bell size={18} className="mr-2" />
-                          Notifications
-                        </h4>
-                        <div className="space-y-4">
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <div className="font-medium">Study Reminders</div>
-                              <div className="text-sm text-gray-600">Get daily reminders to study</div>
-                            </div>
+                        <div className="grid grid-cols-3 gap-3">
+                          {['light', 'dark', 'auto'].map((theme) => (
                             <button
-                              onClick={() => setEditForm({...editForm, dailyReminder: !editForm.dailyReminder})}
-                              className={`w-12 h-6 rounded-full transition-colors ${editForm.dailyReminder ? 'bg-purple-600' : 'bg-gray-300'}`}
+                              key={theme}
+                              onClick={() => setEditForm({...editForm, theme: theme as any})}
+                              className={`rounded-lg border p-4 text-center capitalize transition-colors ${
+                                editForm.theme === theme 
+                                  ? 'border-purple-600 bg-purple-50 text-purple-700' 
+                                  : 'border-gray-200 text-gray-700 hover:bg-gray-50'
+                              }`}
                             >
-                              <div className={`w-5 h-5 rounded-full bg-white transform transition-transform ${editForm.dailyReminder ? 'translate-x-7' : 'translate-x-1'} mt-0.5`} />
+                              {theme}
                             </button>
-                          </div>
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <div className="font-medium">Progress Updates</div>
-                              <div className="text-sm text-gray-600">Weekly study progress reports</div>
-                            </div>
-                            <button
-                              onClick={() => setEditForm({...editForm, notifications: !editForm.notifications})}
-                              className={`w-12 h-6 rounded-full transition-colors ${editForm.notifications ? 'bg-purple-600' : 'bg-gray-300'}`}
-                            >
-                              <div className={`w-5 h-5 rounded-full bg-white transform transition-transform ${editForm.notifications ? 'translate-x-7' : 'translate-x-1'} mt-0.5`} />
-                            </button>
-                          </div>
+                          ))}
                         </div>
                       </div>
 
-                      {/* Study Goals */}
                       <div>
-                        <h4 className="font-medium text-gray-900 mb-4 flex items-center">
-                          <Target size={18} className="mr-2" />
-                          Study Goals
+                        <h4 className="mb-4 flex items-center text-lg font-medium text-gray-900">
+                          <Target size={20} className="mr-2" />
+                          Daily Goal
                         </h4>
-                        <div>
-                          <div className="flex items-center justify-between mb-2">
-                            <div className="font-medium">Daily Study Goal</div>
-                            <div className="text-purple-600 font-medium">{editForm.studyGoal} minutes</div>
-                          </div>
-                          <input
-                            type="range"
-                            min="10"
-                            max="120"
-                            step="5"
-                            value={editForm.studyGoal}
-                            onChange={(e) => setEditForm({...editForm, studyGoal: parseInt(e.target.value)})}
-                            className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-                          />
-                          <div className="flex justify-between text-sm text-gray-500 mt-1">
-                            <span>10 min</span>
-                            <span>120 min</span>
-                          </div>
+                        <div className="mb-2 flex items-center justify-between">
+                          <span className="text-gray-700">Study Goal</span>
+                          <span className="font-medium text-purple-600">{editForm.studyGoal} min</span>
                         </div>
+                        <input
+                          type="range"
+                          min="10"
+                          max="120"
+                          step="5"
+                          value={editForm.studyGoal}
+                          onChange={(e) => setEditForm({...editForm, studyGoal: parseInt(e.target.value)})}
+                          className="w-full"
+                        />
                       </div>
 
-                      {/* Language */}
-                      <div>
-                        <h4 className="font-medium text-gray-900 mb-4 flex items-center">
-                          <Globe size={18} className="mr-2" />
-                          Language
-                        </h4>
-                        <select
-                          value={editForm.language}
-                          onChange={(e) => setEditForm({...editForm, language: e.target.value})}
-                          className="w-full px-4 py-2 border border-gray-300 rounded-lg"
-                        >
-                          <option value="en">English</option>
-                          <option value="es">Spanish</option>
-                          <option value="fr">French</option>
-                          <option value="de">German</option>
-                        </select>
-                      </div>
-
-                      {/* Actions */}
-                      <div className="pt-6 border-t border-gray-200">
-                        <button
-                          onClick={handleSavePreferences}
-                          className="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-medium"
-                        >
-                          Save Preferences
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Data Management */}
-                  <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
-                    <div className="px-6 py-4 border-b border-gray-200">
-                      <h4 className="font-bold text-gray-900">Data Management</h4>
-                    </div>
-                    <div className="p-6 space-y-4">
                       <button
-                        onClick={handleExportAllData}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center justify-between"
+                        onClick={handleSavePreferences}
+                        className="w-full rounded-lg bg-purple-600 px-6 py-3 font-medium text-white hover:bg-purple-700 transition-colors"
                       >
-                        <div className="flex items-center space-x-3">
-                          <Download size={20} />
-                          <div className="text-left">
-                            <div className="font-medium">Export All Data</div>
-                            <div className="text-sm text-gray-600">Download your decks, history, and settings</div>
-                          </div>
-                        </div>
-                        <ChevronRight size={18} />
-                      </button>
-                      
-                      <button
-                        onClick={() => {
-                          if (confirm('Are you sure you want to clear all study history? This cannot be undone.')) {
-                            setStudySessions([]);
-                            localStorage.removeItem('studytoks_sessions');
-                          }
-                        }}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center justify-between text-red-600"
-                      >
-                        <div className="flex items-center space-x-3">
-                          <Trash2 size={20} />
-                          <div className="text-left">
-                            <div className="font-medium">Clear Study History</div>
-                            <div className="text-sm">Remove all past study sessions</div>
-                          </div>
-                        </div>
-                        <ChevronRight size={18} />
+                        Save Preferences
                       </button>
                     </div>
                   </div>
                 </div>
               )}
             </div>
-        </div>
+          </div>
+        ) : (
+          <div className="mx-auto max-w-md">
+            <div className="rounded-2xl border border-gray-200 bg-white p-8 text-center shadow-sm">
+              <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-r from-purple-600 to-blue-600">
+                <User className="text-white" size={32} />
+              </div>
+              <h2 className="mb-4 text-2xl font-bold text-gray-900">Welcome!</h2>
+              <Link 
+                href="/" 
+                className="block w-full rounded-lg bg-purple-600 py-3 font-medium text-white hover:bg-purple-700 transition-colors"
+              >
+                Get Started
+              </Link>
+            </div>
+          </div>
         )}
       </main>
-
-      <footer className="border-t border-gray-200 px-6 py-8 mt-12">
-        <div className="max-w-7xl mx-auto text-center">
-          <p className="text-gray-600">StudyToks • AI-Powered Study Cards • Version 2.0</p>
-          <div className="flex justify-center space-x-6 mt-4 text-sm text-gray-500">
-            <Link href="/" className="hover:text-gray-900">Home</Link>
-            <span>•</span>
-            <Link href="/account" className="hover:text-gray-900">Account</Link>
-            <span>•</span>
-            <button className="hover:text-gray-900" onClick={() => alert('Contact: support@studytoks.com')}>
-              Support
-            </button>
-          </div>
-        </div>
-      </footer>
-      </div>
-    </ProtectedRoute>
+    </div>
   );
 }

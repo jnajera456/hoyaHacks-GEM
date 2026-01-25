@@ -1,18 +1,8 @@
 import { connectDB } from '@/lib/mongodb';
 import { User } from '@/lib/models/User';
 import { NextRequest, NextResponse } from 'next/server';
-import jwt from 'jsonwebtoken';
+import { getTokenFromRequest, verifyToken } from '@/lib/auth';
 import { Types } from 'mongoose';
-
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
-
-function verifyToken(token: string) {
-  try {
-    return jwt.verify(token, JWT_SECRET) as any;
-  } catch (error) {
-    return null;
-  }
-}
 
 /**
  * GET /api/users - Get authenticated user profile
@@ -20,8 +10,7 @@ function verifyToken(token: string) {
  */
 export async function GET(request: NextRequest) {
   try {
-    const authHeader = request.headers.get('authorization');
-    const token = authHeader?.split(' ')[1];
+    const token = getTokenFromRequest(request);
 
     if (!token) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -59,8 +48,7 @@ export async function GET(request: NextRequest) {
  */
 export async function PUT(request: NextRequest) {
   try {
-    const authHeader = request.headers.get('authorization');
-    const token = authHeader?.split(' ')[1];
+    const token = getTokenFromRequest(request);
 
     if (!token) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });

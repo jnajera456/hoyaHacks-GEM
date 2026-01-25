@@ -1,5 +1,4 @@
 "use client";
-
 import { Layout, Typography, Space, Card, Button, Upload, Divider, Input, message, Alert, Progress, Tag } from "antd";
 import { UploadOutlined, FilePdfOutlined, VideoCameraOutlined, FileTextOutlined, CloseOutlined, CheckCircleOutlined, SaveOutlined } from "@ant-design/icons";
 import { useState, useRef } from 'react';
@@ -132,12 +131,11 @@ export default function Home() {
         };
         
         setGeneratedDeck(deck);
-        
-        // Auto-save to account
-        saveDeckToAccount(deck);
-        
         // Store for immediate viewing
         sessionStorage.setItem('currentDeck', JSON.stringify(deck));
+        if (data.savedDeckId) {
+          sessionStorage.setItem('currentDeckId', data.savedDeckId);
+        }
         
       } else {
         message.error(`API error: ${data.error || response.status}`);
@@ -150,26 +148,9 @@ export default function Home() {
     }
   };
 
-  // Save deck function
-  const saveDeckToAccount = (deck: any) => {
-    try {
-      const existingDecks = JSON.parse(localStorage.getItem('studyDecks') || '[]');
-      const existingIndex = existingDecks.findIndex((d: any) => d.id === deck.id);
-      
-      if (existingIndex >= 0) {
-        existingDecks[existingIndex] = deck;
-      } else {
-        existingDecks.push(deck);
-      }
-      
-      localStorage.setItem('studyDecks', JSON.stringify(existingDecks));
-      
-      // Stats update removed for simplicity
-      
-    } catch (error) {
-      console.error('Error saving deck:', error);
-    }
-  };
+  // Persistence handled server-side in /api/generate
+  const saveDeckToAccount = (_deck: any) => {};
+
 
   const getFileIcon = (fileType: string) => {
     if (fileType.includes('pdf')) return <FilePdfOutlined style={{ color: '#ff4d4f' }} />;
@@ -349,7 +330,12 @@ export default function Home() {
                     block
                     onClick={() => {
                       sessionStorage.setItem('currentDeck', JSON.stringify(generatedDeck));
-                      router.push('/results');
+                      const id = sessionStorage.getItem('currentDeckId');
+                      if (id) {
+                        router.push(`/results?id=${encodeURIComponent(id)}`);
+                      } else {
+                        router.push('/results');
+                      }
                     }}
                     style={{ marginBottom: 8 }}
                   >
