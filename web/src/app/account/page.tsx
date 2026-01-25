@@ -6,7 +6,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { FileParser } from '@/utils/fileParser';
 import { 
-  User, BookOpen, Download, Trash2, Settings,
+  User, BookOpen, Trash2, Settings,
   ChevronRight, Moon, Target, LogOut,
   Edit2, Save, X, Flame, BarChart3, FileText, Home, Plus
 } from 'lucide-react';
@@ -85,6 +85,9 @@ export default function AccountPage() {
   const [augmentText, setAugmentText] = useState('');
   const [augmentFile, setAugmentFile] = useState<File | null>(null);
   const [augmentLoading, setAugmentLoading] = useState(false);
+
+  const [renamingDeckId, setRenamingDeckId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState('');
 
   useEffect(() => {
     const load = async () => {
@@ -167,17 +170,33 @@ export default function AccountPage() {
     }
   };
 
-  const handleExportDeck = (deck: GeneratedDeck) => {
-    const dataStr = JSON.stringify(deck, null, 2);
-    const dataBlob = new Blob([dataStr], { type: 'application/json' });
-    const url = URL.createObjectURL(dataBlob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `reelstudy-${deck.title.toLowerCase().replace(/\s+/g, '-')}.json`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+  const handleRenameDeck = async (deckId: string, newTitle: string) => {
+    if (!newTitle.trim()) {
+      alert('Title cannot be empty');
+      return;
+    }
+    try {
+      const response = await fetch(`/api/decks/${encodeURIComponent(deckId)}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ title: newTitle.trim() })
+      });
+      if (response.ok) {
+        setUserDecks(prev => prev.map(record => 
+          record.id === deckId 
+            ? { ...record, deck: { ...record.deck, title: newTitle.trim() } }
+            : record
+        ));
+        setRenamingDeckId(null);
+        setRenameValue('');
+      } else {
+        alert('Failed to rename deck');
+      }
+    } catch (e) {
+      console.error('Failed to rename deck', e);
+      alert('Error renaming deck');
+    }
   };
 
   const handleAugmentFile = async (file: File) => {
@@ -652,11 +671,14 @@ export default function AccountPage() {
                                     Add Materials
                                   </button>
                                   <button
-                                    onClick={() => handleExportDeck(deck)}
+                                    onClick={() => {
+                                      setRenamingDeckId(record.id);
+                                      setRenameValue(deck.title);
+                                    }}
                                     className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 flex items-center justify-center gap-2 transition-colors"
                                   >
-                                    <Download size={14} />
-                                    Export
+                                    <Edit2 size={14} />
+                                    Rename
                                   </button>
                                   <button
                                     onClick={() => handleDeleteDeck(record.id)}
@@ -828,6 +850,55 @@ export default function AccountPage() {
                     className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {augmentLoading ? 'Adding...' : 'Add Materials'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Rename Deck Modal */}
+        {renamingDeckId && (
+          <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-lg shadow-lg max-w-md w-full">
+              <div className="p-6">
+                <h2 className="text-2xl font-bold mb-4">Rename Deck</h2>
+                
+                <div>
+                  <label className="block text-sm font-semibold mb-2">New Deck Title</label>
+                  <input
+                    type="text"
+                    value={renameValue}
+                    onChange={(e) => setRenameValue(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        handleRenameDeck(renamingDeckId, renameValue);
+                      } else if (e.key === 'Escape') {
+                        setRenamingDeckId(null);
+                        setRenameValue('');
+                      }
+                    }}
+                    className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                    placeholder="Enter new deck title..."
+                    autoFocus
+                  />
+                </div>
+
+                <div className="flex gap-3 mt-6">
+                  <button
+                    onClick={() => {
+                      setRenamingDeckId(null);
+                      setRenameValue('');
+                    }}
+                    className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => handleRenameDeck(renamingDeckId, renameValue)}
+                    className="flex-1 px-4 py-2 bg-[#fa541c] text-white rounded-lg hover:bg-[#ff7a45] transition-colors"
+                  >
+                    Rename
                   </button>
                 </div>
               </div>
