@@ -55,3 +55,51 @@ export async function DELETE(
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
+
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+  try {
+    const token = getTokenFromRequest(request);
+    if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const decoded = verifyToken(token);
+    if (!decoded) return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
+
+    const body = await request.json();
+    const { title } = body;
+
+    if (!title || typeof title !== 'string' || !title.trim()) {
+      return NextResponse.json({ error: 'Invalid title' }, { status: 400 });
+    }
+
+    await connectDB();
+    try { await GeneratedDeck.createCollection(); } catch {}
+    try { await GeneratedDeck.syncIndexes(); } catch {}
+    
+    const doc = await GeneratedDeck.findOne({ _id: id, userId: decoded.userId });
+    if (!doc) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+
+    // Update both the title field and the nested deck.title
+    doc.title = title.trim();
+    if (doc.deck) {
+      doc.deck.title = title.trim();
+    }
+    await doc.save();
+
+    return NextResponse.json({ 
+      success: true,
+      deck: {
+        id: doc._id.toString(),
+        deckId: doc.deckId,
+        title: doc.title,
+        createdAt: doc.createdAt,
+        deck: doc.deck,
+      }
+    });
+  } catch (error) {
+    console.error('Update deck error:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}

@@ -23,8 +23,8 @@ export const CONFIG = {
   // Storage Configuration
   STORAGE_KEYS: {
     DECKS: 'studyDecks',
-    USER: 'studytoks_user',
-    SESSIONS: 'studytoks_sessions',
+    USER: 'reelstudy_user',
+    SESSIONS: 'reelstudy_sessions',
     CURRENT_DECK: 'currentDeck'
   }
 };
