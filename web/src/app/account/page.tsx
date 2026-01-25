@@ -173,7 +173,7 @@ export default function AccountPage() {
     const url = URL.createObjectURL(dataBlob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `studytoks-${deck.title.toLowerCase().replace(/\s+/g, '-')}.json`;
+    link.download = `reelstudy-${deck.title.toLowerCase().replace(/\s+/g, '-')}.json`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -297,7 +297,7 @@ export default function AccountPage() {
       </p>
       <Link
         href="/"
-        className="inline-flex items-center gap-2 rounded-lg bg-purple-600 px-6 py-3 text-sm font-medium text-white hover:bg-purple-700 transition-colors"
+        className="inline-flex items-center gap-2 rounded-lg bg-[#fa541c] px-6 py-3 text-sm font-medium text-white hover:bg-[#ff7a45] transition-colors"
       >
         <Home size={18} />
         Go to Home
@@ -306,7 +306,7 @@ export default function AccountPage() {
   );
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
+    <div className="min-h-screen bg-gradient-to-b from-orange-50 to-white">
       {/* Global Navbar is rendered via layout; removed duplicate header */}
 
       {/* Main Content */}
@@ -321,7 +321,7 @@ export default function AccountPage() {
                   <div className="flex flex-col items-center">
                     <div 
                       className="mb-4 flex h-24 w-24 items-center justify-center rounded-full text-3xl font-bold text-white"
-                      style={{ backgroundColor: user.avatarColor || '#7C3AED' }}
+                      style={{ backgroundColor: user.avatarColor || '#fa541c' }}
                     >
                       {user.name.charAt(0)}
                     </div>
@@ -332,14 +332,14 @@ export default function AccountPage() {
                           type="text"
                           value={editForm.name}
                           onChange={(e) => setEditForm({...editForm, name: e.target.value})}
-                          className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 focus:outline-none"
+                          className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-orange-500 focus:ring-2 focus:ring-orange-200 focus:outline-none"
                           placeholder="Your name"
                         />
                         {/* Email editing disabled: email is immutable */}
                         <div className="flex gap-2">
                           <button
                             onClick={handleSaveProfile}
-                            className="flex-1 rounded-lg bg-purple-600 px-4 py-2 font-medium text-white hover:bg-purple-700 flex items-center justify-center gap-2 transition-colors"
+                            className="flex-1 rounded-lg bg-[#fa541c] px-4 py-2 font-medium text-white hover:bg-[#ff7a45] flex items-center justify-center gap-2 transition-colors"
                           >
                             <Save size={18} />
                             Save
@@ -363,7 +363,7 @@ export default function AccountPage() {
                         )}
                         <button
                           onClick={() => setIsEditingProfile(true)}
-                          className="mt-4 flex items-center gap-2 rounded-lg px-4 py-2 text-purple-600 hover:bg-purple-50 transition-colors"
+                          className="mt-4 flex items-center gap-2 rounded-lg px-4 py-2 text-[#fa541c] hover:bg-orange-50 transition-colors"
                         >
                           <Edit2 size={16} />
                           <span className="font-medium">Edit Profile</span>
@@ -380,48 +380,48 @@ export default function AccountPage() {
                   onClick={() => setActiveTab('overview')}
                   className={`flex w-full items-center justify-between px-6 py-4 transition-colors hover:bg-gray-50 ${
                     activeTab === 'overview' 
-                      ? 'border-l-4 border-purple-600 bg-purple-50 text-purple-700' 
+                      ? 'border-l-4 border-orange-500 bg-orange-50 text-orange-700' 
                       : 'text-gray-700'
                   }`}
                 >
                   <div className="flex items-center gap-3">
-                    <BarChart3 size={20} className={activeTab === 'overview' ? 'text-purple-600' : 'text-gray-400'} />
+                    <BarChart3 size={20} className={activeTab === 'overview' ? 'text-[#fa541c]' : 'text-gray-400'} />
                     <span className="font-medium">Overview</span>
                   </div>
-                  <ChevronRight size={18} className={activeTab === 'overview' ? 'text-purple-600' : 'text-gray-400'} />
+                  <ChevronRight size={18} className={activeTab === 'overview' ? 'text-[#fa541c]' : 'text-gray-400'} />
                 </button>
                 
                 <button
                   onClick={() => setActiveTab('decks')}
                   className={`flex w-full items-center justify-between px-6 py-4 transition-colors hover:bg-gray-50 ${
                     activeTab === 'decks' 
-                      ? 'border-l-4 border-purple-600 bg-purple-50 text-purple-700' 
+                      ? 'border-l-4 border-orange-500 bg-orange-50 text-orange-700' 
                       : 'text-gray-700'
                   }`}
                 >
                   <div className="flex items-center gap-3">
-                    <BookOpen size={20} className={activeTab === 'decks' ? 'text-purple-600' : 'text-gray-400'} />
+                    <BookOpen size={20} className={activeTab === 'decks' ? 'text-[#fa541c]' : 'text-gray-400'} />
                     <span className="font-medium">My Decks</span>
                     <span className="rounded-full bg-gray-100 px-2 py-1 text-xs text-gray-600">
                       {userDecks.length}
                     </span>
                   </div>
-                  <ChevronRight size={18} className={activeTab === 'decks' ? 'text-purple-600' : 'text-gray-400'} />
+                  <ChevronRight size={18} className={activeTab === 'decks' ? 'text-[#fa541c]' : 'text-gray-400'} />
                 </button>
                 
                 <button
                   onClick={() => setActiveTab('preferences')}
                   className={`flex w-full items-center justify-between px-6 py-4 transition-colors hover:bg-gray-50 ${
                     activeTab === 'preferences' 
-                      ? 'border-l-4 border-purple-600 bg-purple-50 text-purple-700' 
+                      ? 'border-l-4 border-orange-500 bg-orange-50 text-orange-700' 
                       : 'text-gray-700'
                   }`}
                 >
                   <div className="flex items-center gap-3">
-                    <Settings size={20} className={activeTab === 'preferences' ? 'text-purple-600' : 'text-gray-400'} />
+                    <Settings size={20} className={activeTab === 'preferences' ? 'text-[#fa541c]' : 'text-gray-400'} />
                     <span className="font-medium">Preferences</span>
                   </div>
-                  <ChevronRight size={18} className={activeTab === 'preferences' ? 'text-purple-600' : 'text-gray-400'} />
+                  <ChevronRight size={18} className={activeTab === 'preferences' ? 'text-[#fa541c]' : 'text-gray-400'} />
                 </button>
               </div>
 
@@ -453,10 +453,10 @@ export default function AccountPage() {
               {activeTab === 'overview' && (
                 <div className="space-y-6">
                   {/* Welcome Banner */}
-                  <div className="overflow-hidden rounded-2xl bg-gradient-to-r from-purple-600 to-blue-600 p-8 text-white">
+                  <div className="overflow-hidden rounded-2xl bg-gradient-to-r from-orange-500 via-orange-400 to-amber-300 p-8 text-white">
                     <div>
                       <h2 className="text-2xl font-bold">Welcome back, {user.name.split(' ')[0]}! 👋</h2>
-                      <p className="mt-2 text-purple-100">
+                      <p className="mt-2 text-orange-100">
                         {stats.totalDecks > 0 
                           ? `You have ${stats.totalDecks} study decks with ${stats.totalMaterials} materials.`
                           : 'Generate your first study deck to get started!'}
@@ -504,7 +504,7 @@ export default function AccountPage() {
                         <h3 className="text-lg font-bold text-gray-900">Recent Decks</h3>
                         <Link 
                           href="/" 
-                          className="text-sm font-medium text-purple-600 hover:text-purple-700"
+                          className="text-sm font-medium text-[#fa541c] hover:text-[#ff7a45]"
                         >
                           + Create New
                         </Link>
@@ -533,7 +533,7 @@ export default function AccountPage() {
                                 </div>
                                 <button
                                   onClick={() => handleStudyDeck(record)}
-                                  className="rounded-lg bg-purple-600 px-4 py-2 text-sm font-medium text-white hover:bg-purple-700 flex items-center gap-2 transition-colors"
+                                  className="rounded-lg bg-[#fa541c] px-4 py-2 text-sm font-medium text-white hover:bg-[#ff7a45] flex items-center gap-2 transition-colors"
                                 >
                                   <BookOpen size={14} />
                                   Study
@@ -549,7 +549,7 @@ export default function AccountPage() {
                         <p className="text-gray-500">No study decks yet</p>
                         <Link 
                           href="/" 
-                          className="mt-4 inline-block rounded-lg bg-purple-600 px-6 py-2 font-medium text-white hover:bg-purple-700"
+                          className="mt-4 inline-block rounded-lg bg-[#fa541c] px-6 py-2 font-medium text-white hover:bg-[#ff7a45]"
                         >
                           Create First Deck
                         </Link>
@@ -570,7 +570,7 @@ export default function AccountPage() {
                         </div>
                         <Link
                           href="/"
-                          className="rounded-lg bg-purple-600 px-4 py-2 font-medium text-white hover:bg-purple-700 flex items-center gap-2 transition-colors"
+                          className="rounded-lg bg-[#fa541c] px-4 py-2 font-medium text-white hover:bg-[#ff7a45] flex items-center gap-2 transition-colors"
                         >
                           <BookOpen size={18} />
                           Create New
@@ -590,8 +590,8 @@ export default function AccountPage() {
                                 <div className="flex-1">
                                   <div className="flex items-start gap-4">
                                     <div className="hidden sm:flex">
-                                      <div className="rounded-lg bg-purple-50 p-3">
-                                        <BookOpen className="text-purple-600" size={20} />
+                                      <div className="rounded-lg bg-orange-50 p-3">
+                                        <BookOpen className="text-[#fa541c]" size={20} />
                                       </div>
                                     </div>
                                     <div className="flex-1">
@@ -616,7 +616,7 @@ export default function AccountPage() {
                                           </span>
                                         )}
                                         {deckStats.games > 0 && (
-                                          <span className="rounded bg-purple-100 px-2 py-1 text-xs text-purple-700">
+                                          <span className="rounded bg-orange-100 px-2 py-1 text-xs text-orange-700">
                                             🎮 {deckStats.games} Games
                                           </span>
                                         )}
@@ -636,7 +636,7 @@ export default function AccountPage() {
                                 <div className="flex flex-col gap-2 sm:ml-4">
                                   <button
                                     onClick={() => handleStudyDeck(record)}
-                                    className="rounded-lg bg-purple-600 px-4 py-2 text-sm font-medium text-white hover:bg-purple-700 flex items-center justify-center gap-2 transition-colors"
+                                    className="rounded-lg bg-[#fa541c] px-4 py-2 text-sm font-medium text-white hover:bg-[#ff7a45] flex items-center justify-center gap-2 transition-colors"
                                   >
                                     <BookOpen size={14} />
                                     Study
@@ -677,7 +677,7 @@ export default function AccountPage() {
                         <p className="text-lg text-gray-500">No saved decks yet</p>
                         <Link 
                           href="/" 
-                          className="mt-6 inline-block rounded-lg bg-purple-600 px-6 py-3 font-medium text-white hover:bg-purple-700"
+                          className="mt-6 inline-block rounded-lg bg-[#fa541c] px-6 py-3 font-medium text-white hover:bg-[#ff7a45]"
                         >
                           Create Your First Deck
                         </Link>
@@ -707,7 +707,7 @@ export default function AccountPage() {
                               onClick={() => setEditForm({...editForm, theme: theme as any})}
                               className={`rounded-lg border p-4 text-center capitalize transition-colors ${
                                 editForm.theme === theme 
-                                  ? 'border-purple-600 bg-purple-50 text-purple-700' 
+                                  ? 'border-orange-500 bg-orange-50 text-orange-700' 
                                   : 'border-gray-200 text-gray-700 hover:bg-gray-50'
                               }`}
                             >
@@ -724,7 +724,7 @@ export default function AccountPage() {
                         </h4>
                         <div className="mb-2 flex items-center justify-between">
                           <span className="text-gray-700">Study Goal</span>
-                          <span className="font-medium text-purple-600">{editForm.studyGoal} min</span>
+                          <span className="font-medium text-[#fa541c]">{editForm.studyGoal} min</span>
                         </div>
                         <input
                           type="range"
@@ -739,7 +739,7 @@ export default function AccountPage() {
 
                       <button
                         onClick={handleSavePreferences}
-                        className="w-full rounded-lg bg-purple-600 px-6 py-3 font-medium text-white hover:bg-purple-700 transition-colors"
+                        className="w-full rounded-lg bg-[#fa541c] px-6 py-3 font-medium text-white hover:bg-[#ff7a45] transition-colors"
                       >
                         Save Preferences
                       </button>
@@ -752,13 +752,13 @@ export default function AccountPage() {
         ) : (
           <div className="mx-auto max-w-md">
             <div className="rounded-2xl border border-gray-200 bg-white p-8 text-center shadow-sm">
-              <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-r from-purple-600 to-blue-600">
+              <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-r from-orange-500 via-orange-400 to-amber-300">
                 <User className="text-white" size={32} />
               </div>
               <h2 className="mb-4 text-2xl font-bold text-gray-900">Welcome!</h2>
               <Link 
                 href="/" 
-                className="block w-full rounded-lg bg-purple-600 py-3 font-medium text-white hover:bg-purple-700 transition-colors"
+                className="block w-full rounded-lg bg-[#fa541c] py-3 font-medium text-white hover:bg-[#ff7a45] transition-colors"
               >
                 Get Started
               </Link>

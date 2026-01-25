@@ -112,7 +112,7 @@ export interface UserType {
 
 export function getUser(): UserType | null {
   try {
-    return JSON.parse(localStorage.getItem('studytoks_user') || 'null');
+    return JSON.parse(localStorage.getItem('reelstudy_user') || 'null');
   } catch (error) {
     console.error('Error getting user:', error);
     return null;
@@ -121,7 +121,7 @@ export function getUser(): UserType | null {
 
 export function saveUser(user: UserType): boolean {
   try {
-    localStorage.setItem('studytoks_user', JSON.stringify(user));
+    localStorage.setItem('reelstudy_user', JSON.stringify(user));
     return true;
   } catch (error) {
     console.error('Error saving user:', error);

@@ -1,20 +1,17 @@
 "use client";
-import { Layout, Typography, Space, Card, Button, Upload, Divider, Input, message, Alert, Progress, Tag } from "antd";
+import { Upload, Divider, Input, message, Tag } from "antd";
 import { UploadOutlined, FilePdfOutlined, VideoCameraOutlined, FileTextOutlined, CloseOutlined, CheckCircleOutlined, SaveOutlined } from "@ant-design/icons";
-import { useState, useRef } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { FileParser, FileParseResult } from '@/utils/fileParser';
 
-const { Header, Content, Footer } = Layout;
-const { Title, Text, Paragraph } = Typography;
 const { TextArea } = Input;
 
 interface UploadedFile {
   file: File;
   parsedContent?: FileParseResult;
   status: 'uploading' | 'parsing' | 'ready' | 'error';
-  progress?: number;
 }
 
 export default function Home() {
@@ -22,371 +19,310 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [generatedDeck, setGeneratedDeck] = useState<any>(null);
+  const [savedDeckId, setSavedDeckId] = useState<string | null>(null);
   const router = useRouter();
 
-  const handleFileUpload = async (file: File) => {
-    // Check file size (max 10MB)
-    if (file.size > 10 * 1024 * 1024) {
-      message.error('File size must be less than 10MB');
-      return false;
-    }
-
-    // Add file to state
-    const uploadedFile: UploadedFile = {
-      file,
-      status: 'uploading'
-    };
-    
-    setUploadedFiles(prev => [...prev, uploadedFile]);
-
-    // Parse file content
-    try {
-      setUploadedFiles(prev => 
-        prev.map(f => f.file === file ? { ...f, status: 'parsing', progress: 25 } : f)
-      );
-
-      const parsedContent = await FileParser.parseFile(file);
-
-      setUploadedFiles(prev => 
-        prev.map(f => f.file === file ? { 
-          ...f, 
-          parsedContent, 
-          status: 'ready', 
-          progress: 100 
-        } : f)
-      );
-
-      message.success(`Successfully processed ${file.name}`);
-      
-      // NO AUTO-SWITCH to text tab - files stay separate
-
-    } catch (error: any) {
-      console.error('File parsing error:', error);
-      setUploadedFiles(prev => 
-        prev.map(f => f.file === file ? { ...f, status: 'error' } : f)
-      );
-      message.error(`Failed to process ${file.name}: ${error.message}`);
-    }
-    
-    return false;
+  const getFileIcon = (fileType: string) => {
+    const normalized = fileType.toLowerCase();
+    if (normalized.includes('pdf')) return <FilePdfOutlined style={{ color: '#fa541c' }} />;
+    if (normalized.includes('video')) return <VideoCameraOutlined style={{ color: '#fa8c16' }} />;
+    if (normalized.includes('audio')) return <VideoCameraOutlined style={{ color: '#faad14' }} />;
+    return <FileTextOutlined style={{ color: '#fa541c' }} />;
   };
 
-  const removeFile = (fileToRemove: File) => {
-    setUploadedFiles(prev => prev.filter(f => f.file !== fileToRemove));
+  const removeFile = (file: File) => {
+    setUploadedFiles((prev) => {
+      const next = prev.filter((f) => f.file !== file);
+      if (prev.length === 1) {
+        setText('');
+      }
+      return next;
+    });
+  };
+
+  const handleFileUpload = async (file: File) => {
+    if (file.size > 10 * 1024 * 1024) {
+      message.error('File size must be less than 10MB');
+      return Upload.LIST_IGNORE;
+    }
+
+    setUploadedFiles([{ file, status: 'parsing' }]);
+
+    try {
+      const parsed = await FileParser.parseFile(file);
+      setUploadedFiles([{ file, status: 'ready', parsedContent: parsed }]);
+      setText((prev) => (prev ? prev : parsed.text));
+      message.success('File uploaded and parsed');
+    } catch (error: any) {
+      console.error('Upload error:', error);
+      setUploadedFiles([{ file, status: 'error' }]);
+      message.error(error?.message || 'Failed to parse file');
+    }
+
+    return Upload.LIST_IGNORE;
   };
 
   const handleGenerate = async () => {
-    // Determine source: uploaded file OR text input
-    let contentToSend = '';
-    let fileName = '';
-    let fileType = '';
-
-    // Priority: Use uploaded file if available, otherwise use text
-    const readyFile = uploadedFiles.find(f => f.status === 'ready');
-    
-    if (readyFile && readyFile.parsedContent) {
-      // Use file content (already normalized by parser)
-      contentToSend = readyFile.parsedContent.text;
-      fileName = readyFile.file.name;
-      fileType = readyFile.file.type;
-    } else if (text.trim()) {
-      // Use text input (normalize it for consistency with file parsing)
-      contentToSend = text
-        .replace(/\r\n/g, '\n')        // CRLF → LF
-        .replace(/[ \u00A0]+/g, ' ')   // Collapse repeated spaces
-        .replace(/\n{3,}/g, '\n\n')    // Collapse 3+ newlines to 2
-        .trim();
-    } else {
-      message.error('Please upload a file or paste some text first!');
+    const sourceText = text.trim() || uploadedFiles[0]?.parsedContent?.text || '';
+    if (!sourceText || sourceText.length < 50) {
+      message.error('Provide at least 50 characters via upload or pasted text.');
       return;
     }
-
-    // Validate content length before sending to Gemini
-    const MAX_CONTENT_LENGTH = 10000;
-    if (contentToSend.length > MAX_CONTENT_LENGTH) {
-      message.warning(`Content exceeds ${MAX_CONTENT_LENGTH} characters. Truncating...`);
-      contentToSend = contentToSend.substring(0, MAX_CONTENT_LENGTH) + '\n... [truncated]';
-    }
-
-    if (contentToSend.length < 50) {
-      message.error('Content is too short. Please provide at least 50 characters.');
-      return;
-    }
-
-    console.log('📤 Sending to Gemini:', {
-      source: readyFile ? `File: ${fileName}` : 'Text input',
-      contentLength: contentToSend.length,
-      pageCount: readyFile?.parsedContent?.metadata.pages
-    });
 
     setLoading(true);
-    setGeneratedDeck(null);
-    
     try {
       const response = await fetch('/api/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          text: contentToSend,
-          fileName,
-          fileType
-        })
+        body: JSON.stringify({
+          text: sourceText,
+          fileName: uploadedFiles[0]?.file.name,
+          fileType: uploadedFiles[0]?.file.type,
+        }),
       });
 
       const data = await response.json();
-      
-      if (response.ok && data.success) {
-        const sourceType = readyFile ? `file "${fileName}"` : 'text';
-        message.success(`✅ Generated ${data.materials?.length || 0} study materials from ${sourceType}!`);
-        
-        // Create deck from response
-        const deck = data.deck || {
-          id: `deck_${Date.now()}`,
-          title: readyFile 
-            ? `Study: ${fileName}`
-            : `Study: ${text.substring(0, 30)}${text.length > 30 ? '...' : ''}`,
-          materials: data.materials,
-          sourceText: contentToSend.substring(0, 500) + (contentToSend.length > 500 ? '...' : ''),
-          sourceFile: readyFile ? { name: fileName, type: fileType } : undefined,
-          generatedAt: new Date().toISOString()
-        };
-        
-        setGeneratedDeck(deck);
-        // Store for immediate viewing
-        sessionStorage.setItem('currentDeck', JSON.stringify(deck));
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || 'Failed to generate study materials');
+      }
+
+      setGeneratedDeck(data.deck);
+      setSavedDeckId(data.savedDeckId || null);
+
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem('currentDeck', JSON.stringify(data.deck));
         if (data.savedDeckId) {
           sessionStorage.setItem('currentDeckId', data.savedDeckId);
         }
-        
-      } else {
-        message.error(`API error: ${data.error || response.status}`);
       }
-    } catch (error) {
-      message.error('Network error - check console');
-      console.error('Request failed:', error);
+
+      message.success(data.message || 'Deck generated!');
+    } catch (error: any) {
+      console.error('Generate error:', error);
+      message.error(error?.message || 'Failed to generate deck');
     } finally {
       setLoading(false);
     }
   };
 
-  // Persistence handled server-side in /api/generate
-  const saveDeckToAccount = (_deck: any) => {};
-
-
-  const getFileIcon = (fileType: string) => {
-    if (fileType.includes('pdf')) return <FilePdfOutlined style={{ color: '#ff4d4f' }} />;
-    if (fileType.includes('video')) return <VideoCameraOutlined style={{ color: '#1890ff' }} />;
-    if (fileType.includes('audio')) return <VideoCameraOutlined style={{ color: '#52c41a' }} />;
-    return <FileTextOutlined />;
+  const saveDeckToAccount = async (deck: any) => {
+    if (!deck) {
+      message.info('Generate a deck first.');
+      return;
+    }
+    if (savedDeckId) {
+      message.success('Deck already saved. Opening your decks...');
+      router.push('/account');
+      return;
+    }
+    message.info('Deck is auto-saved after generation.');
+    router.push('/account');
   };
 
   return (
     <ProtectedRoute>
-      <Layout style={{ minHeight: "100vh" }}>
-        <Content style={{ padding: 16, maxWidth: 520, width: "100%", margin: "0 auto" }}>
-        <Space orientation="vertical" size="large" style={{ width: "100%", marginTop: 8 }}>
-          <div>
-            <Title level={2} style={{ marginBottom: 0 }}>
-              Upload & Generate Study Materials
-            </Title>
-            <Text type="secondary">
-              Upload files or paste text to create study decks, flashcards, and summaries.
-            </Text>
+      <div className="min-h-screen bg-gradient-to-b from-orange-50 via-white to-white">
+        <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-10 py-10 space-y-8">
+          {/* Hero */}
+          <div
+            className="overflow-hidden rounded-2xl shadow-lg"
+            style={{
+              backgroundImage: 'linear-gradient(90deg, #fa541c 0%, #fb6a1f 68%, #ffd166 96%)'
+            }}
+          >
+            <div className="flex flex-col gap-4 px-6 py-8 lg:px-10 lg:py-10">
+              <p className="text-sm font-semibold uppercase tracking-wide text-white/80">ReelStudy</p>
+              <h1 className="text-3xl sm:text-4xl font-extrabold text-white leading-tight">
+                Upload or paste, then generate study decks fast.
+              </h1>
+              <p className="text-white/90 text-lg max-w-3xl">
+                Turn PDFs, videos, or text into flashcards, quizzes, and visuals in seconds—then save and study.
+              </p>
+            </div>
           </div>
 
-          <Card>
-            {/* File Upload Section */}
-            <div style={{ marginBottom: 24 }}>
-              <Title level={4} style={{ marginTop: 0 }}>Upload File</Title>
-              <Paragraph type="secondary">
-                Upload PDF, TXT, video, or audio files.
-              </Paragraph>
+          <div className="grid lg:grid-cols-[1.2fr_0.8fr] gap-6">
+            {/* Left: Input Card */}
+            <div className="rounded-2xl bg-white shadow-sm border border-orange-100/60 p-6 space-y-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-xl font-bold text-[#303545]">Upload file</h2>
+                  <p className="text-sm text-[#646975]">PDF, TXT, MP4, MP3 (max 10MB). We’ll parse and clean it.</p>
+                </div>
+                <span className="rounded-full bg-orange-50 text-[#fa541c] text-sm font-semibold px-3 py-1">Step 1</span>
+              </div>
 
-              <Upload 
+              <Upload
                 beforeUpload={handleFileUpload}
                 maxCount={1}
                 accept=".pdf,.txt,.mp4,.mov,.mp3,.wav"
                 showUploadList={false}
               >
-                <div style={{ 
-                  border: '2px dashed #d9d9d9',
-                  borderRadius: 8,
-                  padding: 32,
-                  textAlign: 'center',
-                  cursor: 'pointer',
-                  marginBottom: 16,
-                  backgroundColor: '#fafafa'
-                }}>
-                  <UploadOutlined style={{ fontSize: 32, color: '#1890ff', marginBottom: 8 }} />
-                  <div>
-                    <Text strong>Click to upload file</Text>
-                    <Paragraph type="secondary" style={{ margin: '4px 0 0 0' }}>
-                      PDF, TXT, MP4, MP3 (max 10MB)
-                    </Paragraph>
-                  </div>
+                <div className="border-2 border-dashed border-orange-200 rounded-xl p-6 text-center cursor-pointer bg-orange-50/50 hover:bg-orange-50 transition">
+                  <UploadOutlined style={{ fontSize: 32, color: '#fa541c', marginBottom: 8 }} />
+                  <div className="text-[#303545] font-semibold">Click to upload file</div>
+                  <p className="text-sm text-[#646975] mt-1">We support PDF, TXT, MP4, MP3 up to 10MB</p>
                 </div>
               </Upload>
 
-              {/* Uploaded Files List - Single file only */}
               {uploadedFiles.length > 0 && (
-                <div style={{ marginTop: 16 }}>
-                  <Text strong>Uploaded File:</Text>
-                  <div style={{ marginTop: 8 }}>
-                    {uploadedFiles.map((uploadedFile, index) => (
-                      <div 
-                        key={index}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          padding: '12px',
-                          border: '1px solid #f0f0f0',
-                          borderRadius: 6,
-                          backgroundColor: '#fafafa'
-                        }}
-                      >
-                        <div style={{ marginRight: 12 }}>
-                          {getFileIcon(uploadedFile.file.type)}
-                        </div>
-                        <div style={{ flex: 1 }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                            <Text strong>{uploadedFile.file.name}</Text>
-                            <Tag color={
-                              uploadedFile.status === 'ready' ? 'success' :
-                              uploadedFile.status === 'error' ? 'error' :
-                              'processing'
-                            }>
-                              {uploadedFile.status}
-                            </Tag>
-                          </div>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4 }}>
-                            <Text type="secondary" style={{ fontSize: 12 }}>
-                              {(uploadedFile.file.size / 1024).toFixed(1)} KB
-                            </Text>
-                            <Button 
-                              type="text" 
-                              size="small"
-                              onClick={() => removeFile(uploadedFile.file)}
-                              style={{ padding: 0, height: 'auto' }}
-                            >
-                              Remove
-                            </Button>
-                          </div>
-                        </div>
+                <div className="space-y-3">
+                  <p className="text-sm font-semibold text-[#303545]">Uploaded File</p>
+                  {uploadedFiles.map((uploadedFile, index) => (
+                    <div
+                      key={index}
+                      className="flex items-center gap-3 rounded-lg border border-orange-100 bg-orange-50/60 px-4 py-3"
+                    >
+                      <div className="text-xl">
+                        {getFileIcon(uploadedFile.file.type)}
                       </div>
+                      <div className="flex-1">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-semibold text-[#303545] truncate">{uploadedFile.file.name}</span>
+                          <Tag color={
+                            uploadedFile.status === 'ready' ? 'success' :
+                            uploadedFile.status === 'error' ? 'error' :
+                            'processing'
+                          }>
+                            {uploadedFile.status}
+                          </Tag>
+                        </div>
+                        {uploadedFile.parsedContent?.metadata?.pages && (
+                          <p className="text-xs text-[#646975]">{uploadedFile.parsedContent.metadata.pages} pages detected</p>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {uploadedFile.status === 'ready' && (
+                          <CheckCircleOutlined style={{ color: '#52c41a', fontSize: 18 }} />
+                        )}
+                        <button
+                          onClick={() => removeFile(uploadedFile.file)}
+                          className="text-[#646975] hover:text-[#303545]"
+                          aria-label="Remove file"
+                        >
+                          <CloseOutlined />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <Divider />
+
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-bold text-[#303545]">Paste text</h3>
+                  <p className="text-sm text-[#646975]">Minimum 50 characters. We normalize formatting automatically.</p>
+                </div>
+                <span className="rounded-full bg-orange-50 text-[#fa541c] text-sm font-semibold px-3 py-1">Step 2</span>
+              </div>
+
+              <TextArea
+                id="paste-text-area"
+                rows={6}
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                placeholder="Paste text here..."
+                style={{ backgroundColor: '#f6f7fb', borderRadius: 10, border: '1px solid #edf0f5' }}
+              />
+
+              <div className="flex flex-wrap gap-3 pt-2">
+                <button
+                  onClick={handleGenerate}
+                  disabled={loading}
+                  className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#fa541c] px-5 py-3 text-white font-semibold shadow-sm transition hover:bg-[#ff7a45] disabled:opacity-60"
+                >
+                  {loading ? 'Generating...' : 'Generate Deck'}
+                </button>
+                <button
+                  onClick={() => saveDeckToAccount(generatedDeck)}
+                  disabled={!generatedDeck}
+                  className="inline-flex items-center justify-center gap-2 rounded-lg border border-orange-200 px-5 py-3 text-[#303545] font-semibold transition hover:border-orange-300 disabled:opacity-50"
+                >
+                  <SaveOutlined /> Save Deck
+                </button>
+                <div className="text-sm text-[#646975] flex items-center gap-2">
+                  <div className="h-2 w-2 rounded-full bg-[#fa541c]"></div>
+                  Decks auto-save to your session
+                </div>
+              </div>
+            </div>
+
+            {/* Right: How it works / Tips */}
+            <div className="rounded-2xl bg-white shadow-sm border border-orange-100/60 p-6 space-y-5">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-bold text-[#303545]">How it works</h3>
+                <span className="rounded-full bg-orange-50 text-[#fa541c] text-sm font-semibold px-3 py-1">Step 3</span>
+              </div>
+              <div className="space-y-4">
+                {[
+                  {
+                    title: 'Upload or paste',
+                    desc: 'We parse PDFs, TXT, and media transcripts; or normalize your pasted text.',
+                  },
+                  {
+                    title: 'Generate with Gemini',
+                    desc: 'We send cleaned content to Gemini to build flashcards, concepts, and quizzes.',
+                  },
+                  {
+                    title: 'Save & study',
+                    desc: 'Your deck is saved in session; save to account and open the Results page to study.',
+                  },
+                ].map((item, idx) => (
+                  <div key={idx} className="flex gap-3">
+                    <div className="mt-1 h-8 w-8 rounded-full bg-orange-100 text-[#fa541c] flex items-center justify-center font-semibold">
+                      {idx + 1}
+                    </div>
+                    <div>
+                      <div className="font-semibold text-[#303545]">{item.title}</div>
+                      <p className="text-sm text-[#646975]">{item.desc}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <Divider />
+
+              <div className="space-y-3">
+                <h4 className="text-sm font-semibold text-[#303545]">Quick tips</h4>
+                <ul className="space-y-2 text-sm text-[#646975] list-disc list-inside">
+                  <li>For PDFs, prefer text-based (not scanned) for best accuracy.</li>
+                  <li>Keep pasted text concise (under 10k characters) for faster results.</li>
+                  <li>Use the Results page to review, augment, and export decks.</li>
+                </ul>
+              </div>
+
+              {generatedDeck && (
+                <div className="rounded-xl border border-orange-100 bg-orange-50/60 p-4 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs uppercase tracking-wide text-[#fa541c] font-semibold">Deck ready</p>
+                      <p className="font-semibold text-[#303545]">{generatedDeck.title}</p>
+                    </div>
+                    <button
+                      onClick={() => router.push('/results')}
+                      className="rounded-lg bg-[#fa541c] px-4 py-2 text-white text-sm font-semibold hover:bg-[#ff7a45]"
+                    >
+                      Open Results
+                    </button>
+                  </div>
+                  <p className="text-sm text-[#646975]">{generatedDeck.materials?.length || 0} materials generated. Saved to session.</p>
+                  <div className="flex flex-wrap gap-2">
+                    {generatedDeck.materials?.slice(0, 6).map((m: any, idx: number) => (
+                      <Tag key={idx} color="orange">{m.type}</Tag>
                     ))}
+                    {generatedDeck.materials?.length > 6 && (
+                      <Tag>+{generatedDeck.materials.length - 6} more</Tag>
+                    )}
                   </div>
                 </div>
               )}
+
             </div>
-
-            <Divider>OR</Divider>
-
-            {/* Text Input Section */}
-            <div style={{ marginBottom: 24 }}>
-              <Title level={4}>Paste Text</Title>
-              <Paragraph type="secondary">
-                Or paste your lecture notes, transcripts, or study material text.
-              </Paragraph>
-
-              <TextArea
-                rows={6}
-                placeholder="Paste your text here..."
-                value={text}
-                onChange={(e) => setText(e.target.value)}
-                style={{ marginBottom: 16 }}
-              />
-            </div>
-
-            <Divider />
-
-            {/* Generate Button */}
-            <Space orientation="vertical" style={{ width: "100%" }}>
-              <Button 
-                type="primary" 
-                block 
-                onClick={handleGenerate}
-                loading={loading}
-                disabled={!text.trim() && uploadedFiles.length === 0}
-                size="large"
-              >
-                {loading ? 'Generating study materials...' : 'Generate Study Materials'}
-              </Button>
-              
-              <Button block onClick={() => router.push('/account')}>
-                View My Decks
-              </Button>
-            </Space>
-          </Card>
-
-          {/* Results Display */}
-          {generatedDeck && (
-            <Card 
-              title={
-                <Space>
-                  <CheckCircleOutlined style={{ color: '#52c41a' }} />
-                  <span>Study Materials Generated!</span>
-                </Space>
-              }
-              style={{ marginTop: 16 }}
-            >
-              <Alert
-                message="Generation Complete!"
-                description="Your study deck has been saved to your account."
-                type="success"
-                showIcon
-                style={{ marginBottom: 16 }}
-              />
-              
-              <div style={{ marginTop: 16 }}>
-                <Text strong>What next?</Text>
-                <div style={{ marginTop: 8 }}>
-                  <Button 
-                    type="primary"
-                    block
-                    onClick={() => {
-                      sessionStorage.setItem('currentDeck', JSON.stringify(generatedDeck));
-                      const id = sessionStorage.getItem('currentDeckId');
-                      if (id) {
-                        router.push(`/results?id=${encodeURIComponent(id)}`);
-                      } else {
-                        router.push('/results');
-                      }
-                    }}
-                    style={{ marginBottom: 8 }}
-                  >
-                    Start Studying Now
-                  </Button>
-                  
-                  <Button 
-                    block
-                    onClick={() => router.push('/account')}
-                  >
-                    Go to My Decks
-                  </Button>
-                </div>
-              </div>
-            </Card>
-          )}
-
-          <Card>
-            <Title level={5} style={{ marginTop: 0 }}>How it works</Title>
-            <ol style={{ margin: 0, paddingLeft: 18 }}>
-              <li><Text strong>Upload a file</Text> (PDF, TXT, video, audio) <strong>OR</strong> <Text strong>paste text</Text></li>
-              <li>Click <Text strong>Generate Study Materials</Text></li>
-              <li>Get flashcards, summaries, and concepts</li>
-              <li>Study with TikTok-style interface</li>
-              <li>All decks saved automatically</li>
-            </ol>
-          </Card>
-        </Space>
-      </Content>
-
-        <Footer style={{ textAlign: "center" }}>
-          <Text type="secondary">
-            Upload files or paste text • Powered by Gemini AI
-          </Text>
-        </Footer>
-      </Layout>
+          </div>
+        </div>
+      </div>
     </ProtectedRoute>
   );
 }
