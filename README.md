@@ -40,7 +40,3 @@ Go to `http://localhost:3000` and start studying!
 - Tailwind CSS
 
 See [web/README.md](./web/README.md) for more details on setup and architecture.
-
-## 📄 License
-
-Created for Hoya Hacks 2026
