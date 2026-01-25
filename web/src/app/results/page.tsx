@@ -346,9 +346,9 @@ export default function ResultsPage() {
   // If no deck is available, show loading state (will redirect)
   if (!deck) {
     return (
-      <div className="w-full h-screen bg-gray-100 flex items-center justify-center">
+      <div className="w-full h-screen bg-gradient-to-b from-orange-50 to-white flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#fa541c] mx-auto mb-4"></div>
           <p className="text-gray-600">Loading...</p>
         </div>
       </div>
@@ -362,7 +362,7 @@ export default function ResultsPage() {
     : ['', ''];
 
   return (
-    <div className="w-full h-screen bg-gray-100">
+    <div className="w-full h-screen bg-gradient-to-b from-orange-50 to-white">
       {/* Navigation buttons fixed to far right of page */}
       <div className="fixed right-8 top-1/2 -translate-y-1/2 z-50 flex flex-col gap-6">
         {/* Audio button */}
@@ -371,8 +371,8 @@ export default function ResultsPage() {
           disabled={audioLoading || audioPlaying}
           className={`w-14 h-14 flex items-center justify-center border-2 rounded-full transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed ${
             audioPlaying 
-              ? 'bg-green-500 border-green-400' 
-              : 'bg-white border-gray-300 hover:bg-gray-100 hover:scale-105'
+              ? 'bg-[#fa541c] border-orange-400' 
+              : 'bg-white border-gray-300 hover:bg-orange-50 hover:border-[#fa541c] hover:scale-105'
           }`}
         >
           {audioLoading ? (
@@ -394,9 +394,9 @@ export default function ResultsPage() {
         <button
           onClick={handlePrev}
           disabled={isTransitioning || !deck}
-          className="w-14 h-14 flex items-center justify-center bg-white border-2 border-gray-300 rounded-full hover:bg-gray-100 hover:scale-105 transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+          className="w-14 h-14 flex items-center justify-center bg-white border-2 border-gray-300 rounded-full hover:bg-orange-50 hover:border-[#fa541c] hover:scale-105 transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          <svg className="w-6 h-6 text-gray-700" fill="none" stroke="currentColor" strokeWidth="3" viewBox="0 0 24 24">
+          <svg className="w-6 h-6 text-[#fa541c]" fill="none" stroke="currentColor" strokeWidth="3" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7" />
           </svg>
         </button>
@@ -404,9 +404,9 @@ export default function ResultsPage() {
         <button
           onClick={handleNext}
           disabled={isTransitioning || !deck}
-          className="w-14 h-14 flex items-center justify-center bg-white border-2 border-gray-300 rounded-full hover:bg-gray-100 hover:scale-105 transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+          className="w-14 h-14 flex items-center justify-center bg-white border-2 border-gray-300 rounded-full hover:bg-orange-50 hover:border-[#fa541c] hover:scale-105 transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          <svg className="w-6 h-6 text-gray-700" fill="none" stroke="currentColor" strokeWidth="3" viewBox="0 0 24 24">
+          <svg className="w-6 h-6 text-[#fa541c]" fill="none" stroke="currentColor" strokeWidth="3" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
           </svg>
         </button>
@@ -415,7 +415,7 @@ export default function ResultsPage() {
       {/* Content area - allows scrolling */}
       <div className="w-full h-full flex items-center justify-center overflow-y-auto">
         {/* Vertical Rectangle with Rounded Corners */}
-        <div className="relative w-full max-w-md h-[90vh] bg-white rounded-2xl shadow-lg my-8">
+        <div className="relative w-full max-w-md h-[90vh] bg-white rounded-2xl shadow-md border border-gray-200 my-8">
           {/* Content Container */}
           <div 
             ref={containerRef}
@@ -471,8 +471,8 @@ export default function ResultsPage() {
                   </div>
                   
                   {selectedOption !== null && currentMaterial.explanation && (
-                    <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                      <MarkdownRenderer content={currentMaterial.explanation} className="text-blue-800 text-sm" />
+                    <div className="mt-6 p-4 bg-orange-50 border border-orange-200 rounded-lg">
+                      <MarkdownRenderer content={currentMaterial.explanation} className="text-orange-800 text-sm" />
                     </div>
                   )}
                 </div>
@@ -499,7 +499,7 @@ export default function ResultsPage() {
                   
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-2">
-                      <div className="text-sm text-blue-600 font-semibold mb-2">Terms</div>
+                      <div className="text-sm text-[#fa541c] font-semibold mb-2">Terms</div>
                       {shuffledTerms.map((item, idx) => (
                         <button
                           key={idx}
@@ -549,13 +549,13 @@ export default function ResultsPage() {
                   </div>
                   
                   {showAnswer ? (
-                    <div className="text-xl text-blue-700 font-semibold">
+                    <div className="text-xl text-[#fa541c] font-semibold">
                       {answer || currentMaterial.content}
                     </div>
                   ) : (
                     <button
                       onClick={() => setShowAnswer(true)}
-                      className="px-8 py-3 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700"
+                      className="px-8 py-3 bg-[#fa541c] text-white font-bold rounded-lg hover:bg-[#ff7a45]"
                     >
                       Reveal Answer
                     </button>
