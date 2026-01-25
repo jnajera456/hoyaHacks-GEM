@@ -52,6 +52,7 @@ export default function ResultsPage() {
   const containerRef = useRef<HTMLDivElement>(null);
   const touchStartY = useRef(0);
   const touchEndY = useRef(0);
+  const audioFeedback = useRef<AudioFeedback | null>(null);
   const currentAudioRef = useRef<HTMLAudioElement | null>(null);
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -195,7 +196,7 @@ export default function ResultsPage() {
   };
 
   useEffect(() => {
-    // Initialize audio feedback
+    // Initialize audio feedback if available
     audioFeedback.current = new AudioFeedback();
   }, []);
 
