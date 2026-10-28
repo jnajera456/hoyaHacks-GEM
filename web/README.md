@@ -1,4 +1,4 @@
-# GEM Web App
+# ReelStudy Web App
 
 ## Quick Setup
 

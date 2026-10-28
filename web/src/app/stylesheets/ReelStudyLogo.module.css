@@ -1,0 +1,25 @@
+.logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: #20242c;
+  line-height: 1;
+}
+
+.mark {
+  flex: none;
+  width: 44px;
+  height: 44px;
+}
+
+.wordmark {
+  font-family: "Gabarito", system-ui, sans-serif;
+  font-size: 1.65rem;
+  font-weight: 800;
+  letter-spacing: -0.055em;
+  white-space: nowrap;
+}
+
+.accent {
+  color: #fa541c;
+}

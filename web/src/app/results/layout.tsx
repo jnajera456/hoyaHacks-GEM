@@ -1,8 +1,8 @@
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'ReelStudy - Study Interface',
-  description: 'TikTok-style study interface for your generated materials',
+  title: 'Study Interface',
+  description: 'Review flashcards, quizzes, and matching games generated from your materials.',
 };
 
 export default function ResultsLayout({
