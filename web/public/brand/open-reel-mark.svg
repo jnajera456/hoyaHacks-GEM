@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" role="img" aria-labelledby="title">
+  <title id="title">ReelStudy Open Reel mark</title>
+  <g id="icon">
+    <g id="reel">
+      <path d="M60 5 80 28H68V92H80L60 115 40 92H52V28H40Z" fill="#20242C"/>
+    </g>
+    <g id="book">
+      <path d="M13 34Q35 25 55 39V91Q35 78 13 87Z" fill="#FFD65A" stroke="#20242C" stroke-width="4" stroke-linejoin="round"/>
+      <path d="M107 34Q85 25 65 39V91Q85 78 107 87Z" fill="#FA541C" stroke="#20242C" stroke-width="4" stroke-linejoin="round"/>
+      <path d="M60 40V96" fill="none" stroke="#FFFDF8" stroke-width="6" stroke-linecap="round"/>
+    </g>
+  </g>
+</svg>

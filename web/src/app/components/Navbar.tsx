@@ -1,16 +1,25 @@
 'use client';
-import { Layout, Menu, Button } from 'antd';
+import { Layout, Menu, Button, Dropdown, type MenuProps } from 'antd';
+import { MenuOutlined } from '@ant-design/icons';
 import { useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import styles from '../stylesheets/Navbar.module.css'; // We will create this next
+import styles from '../stylesheets/Navbar.module.css';
 import { useAuth } from '@/hooks/useAuth';
+import ReelStudyLogo from './ReelStudyLogo';
 
 const { Header } = Layout;
 
 const Navbar = () => {
   const pathname = usePathname();
   const { user, logout, loading, refetch } = useAuth();
+
+  const handleLogout = () => {
+    logout().catch((error: unknown) => {
+      console.error('Sign out failed:', error);
+    });
+  };
+
   // Revalidate auth state when the route changes or window becomes active
   useEffect(() => {
     refetch();
@@ -32,13 +41,25 @@ const Navbar = () => {
   const menuItems = [
     { key: '/', label: <Link href="/">Home</Link> },
     { key: '/account', label: <Link href="/account">Account</Link> },
-  ];
+  ] satisfies NonNullable<MenuProps['items']>;
+
+  const mobileMenuItems = [
+    ...menuItems,
+    ...(loading
+      ? []
+      : user
+        ? [{ key: 'sign-out', label: 'Sign out', onClick: handleLogout }]
+        : [
+            { key: '/login', label: <Link href="/login">Log in</Link> },
+            { key: '/signup', label: <Link href="/signup">Sign up</Link> },
+          ]),
+  ] satisfies NonNullable<MenuProps['items']>;
 
   return (
     <Header className={styles.header}>
-      <div className={styles.logo}>
-        <Link href="/">ReelStudy</Link>
-      </div>
+      <Link href="/" className={styles.brand} aria-label="ReelStudy home">
+        <ReelStudyLogo priority />
+      </Link>
       
       <Menu 
         mode="horizontal" 
@@ -49,7 +70,7 @@ const Navbar = () => {
 
       <div className={styles.authButtons}>
         {loading ? null : user ? (
-          <Button type="default" className={styles.loginBtn} onClick={logout}>
+          <Button type="default" className={styles.loginBtn} onClick={handleLogout}>
             Sign out
           </Button>
         ) : (
@@ -62,6 +83,21 @@ const Navbar = () => {
             </Button>
           </>
         )}
+      </div>
+
+      <div className={styles.mobileMenu}>
+        <Dropdown
+          menu={{ items: mobileMenuItems }}
+          placement="bottomRight"
+          trigger={['click']}
+        >
+          <Button
+            type="text"
+            className={styles.mobileMenuButton}
+            icon={<MenuOutlined />}
+            aria-label="Open navigation menu"
+          />
+        </Dropdown>
       </div>
     </Header>
   );

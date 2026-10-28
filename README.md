@@ -1,5 +1,7 @@
 # ReelStudy
 
+<img src="web/public/brand/open-reel-mark.svg" alt="ReelStudy Open Reel logo" width="96">
+
 ## How It Works
 
 1. Sign up and log in
@@ -40,3 +42,5 @@ Go to `http://localhost:3000` and start studying!
 - Tailwind CSS
 
 See [web/README.md](./web/README.md) for more details on setup and architecture.
+
+Brand assets and usage rules are documented in [BRAND.md](./BRAND.md).
